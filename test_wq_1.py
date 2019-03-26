@@ -94,6 +94,11 @@ print ('best k = ', i-1)
 plt.plot(np.cumsum(explainedVariance))
 plt.xlabel('number of components')
 plt.ylabel('cumulative explained variance')
+############## Reduced Dimension #############################
+df = pj_sp_df.drop('winPlacePerc')
+sp_np = df.toPandas().values
+pc_df = np.dot(sp_np,principal_components[:,:17])
+##########################################################
 ##########################################################
 #for i in range(np.size(principal_components,1)):
 pc1_pd =pd.DataFrame({'Feature': inputcol, 'abs_loading': abs(principal_components[:,0])}).sort_values('abs_loading',ascending=False)
