@@ -98,6 +98,8 @@ plt.ylabel('cumulative explained variance')
 df = pj_sp_df.drop('winPlacePerc')
 sp_np = df.toPandas().values
 pc_df = np.dot(sp_np,principal_components[:,:17])
+pc_df =pd.DataFrame(pc_df)
+pc_df.describe()
 ##########################################################
 ##########################################################
 #for i in range(np.size(principal_components,1)):
