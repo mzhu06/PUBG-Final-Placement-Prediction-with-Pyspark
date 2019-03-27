@@ -156,10 +156,7 @@ print("r2: %f" % train_summary.r2)
 
 ##############################################################
 inputcol = pj_sp_df.columns
-inputcol.remove('winPlacePerc')
-inputcol.remove('killPlace')
-inputcol.remove('killPoints')
-inputcol.remove('rankPoints')
+inputcol = [e for e in inputcol if e not in ['winPlacePerc', 'killPlace','killPoints','rankPoints']]
 ##############################################################
 
 ### Model 1  remove multicollineairity
