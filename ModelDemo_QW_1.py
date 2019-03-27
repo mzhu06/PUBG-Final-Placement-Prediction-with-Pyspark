@@ -135,7 +135,10 @@ def rmseLr(alpha,beta,maxiter = 100,fit_df = training_df, transform_df=validatio
     rmse3_df = pipe_Lr_og.transform(transform_df).select(rmse)
     return {'rmse':rmse3_df.show(),'pipe_model':pipe_Lr_og}
 
-### Model 1 
+############################################################################3
+inputcol = pj_sp_df.columns
+inputcol.remove('winPlacePerc')
+### Model 1  With all input
 rmseLr(0,0)['rmse']
 ### Model 2 
 rmseLr(1,0.1)['rmse']
@@ -147,3 +150,30 @@ rmseLr(0.5,0.1)['rmse']
 ############### Model 1 is the best
 ### Model 1
 rmseLr(0,0)['pipe_model'].transform(testing_df).select(rmse).show()
+train_summary = rmseLr(0,0)['pipe_model'].stages[-1].summary
+print("RMSE: %f" % train_summary.rootMeanSquaredError)
+print("r2: %f" % train_summary.r2)
+
+##############################################################
+inputcol = pj_sp_df.columns
+inputcol.remove('winPlacePerc')
+inputcol.remove('killPlace')
+inputcol.remove('killPoints')
+inputcol.remove('rankPoints')
+##############################################################
+
+### Model 1  remove multicollineairity
+rmseLr(0,0)['rmse']
+### Model 2 
+rmseLr(1,0.1)['rmse']
+### Model 3 
+rmseLr(0,0.1)['rmse']
+### Model 4 
+rmseLr(0.5,0.1)['rmse']
+
+############### Model 1 is the best
+### Model 1
+rmseLr(0,0)['pipe_model'].transform(testing_df).select(rmse).show()
+train_summary = rmseLr(0,0)['pipe_model'].stages[-1].summary
+print("RMSE: %f" % train_summary.rootMeanSquaredError)
+print("r2: %f" % train_summary.r2)
