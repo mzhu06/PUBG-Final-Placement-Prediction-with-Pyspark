@@ -1,0 +1,212 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Mar 24 14:43:57 2019
+
+@author: Qi Wang
+"""
+
+from pyspark.sql import SparkSession
+import numpy as np
+
+spark = SparkSession.builder.getOrCreate()
+sc = spark.sparkContext
+
+import pyspark
+from pyspark.ml import feature, regression, Pipeline
+from pyspark.sql import functions as fn, Row
+from pyspark import sql
+from pyspark.ml.regression import LinearRegression
+from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.ml.classification import LogisticRegression
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+##############################################################################
+##########       Spark creat and transform data             #################
+##############################################################################
+## Spark Method ##
+Full_data = spark.read.csv('train_V2.csv', sep=',', inferSchema=True, header=True)
+# seperate match type
+update_fun = (fn.when(fn.col('matchType').contains('solo'), 'solo').when(fn.col('matchType').contains('duo' or 'crash'), 'duo')
+                .otherwise('squad'))
+Full_data = Full_data.withColumn('matchType', update_fun)
+##############################################################################
+###### collect solo match
+New_df_solo = Full_data.filter(Full_data.matchType == 'solo')
+columns = ['Id','groupId','matchId','matchType']
+New_df_solo = New_df_solo.select([col for col in New_df_solo.columns if col not in columns])
+pj_sp_df_solo = New_df_solo.sample(withReplacement=False, fraction=0.1, seed=3)
+##############################################################################
+###### collect team match
+New_df_team  = Full_data.select('*').groupby('groupId').agg(fn.sum('damageDealt').alias('total_team_damage'),
+                      fn.sum('kills').alias('total_team_kills'),
+                      fn.sum('killPoints').alias('team_kill_points'),
+                      fn.avg('killPlace').alias('team_kill_rank'),
+                      fn.avg('rankPoints').alias('team_normal_rank'),
+                      fn.sum('revives').alias('team_revives'),
+                      fn.sum('boosts').alias('team_boosts'),
+                      fn.sum('assists').alias('total_assists'),
+                      fn.sum('DBNOs').alias('team_DBNOs'),
+                      fn.sum(Full_data.rideDistance + Full_data.walkDistance + Full_data.swimDistance).alias('totalDistance'))
+New_df_team  = New_df_team.join(Full_data,New_df_team .groupId == Full_data.groupId)
+
+
+##
+columns = ['Id','groupId','matchId', 'roadKills','numGroups','rideDistance','walkDistance','swimDistance','kills','killPints','killPlace','rankPoints','revives','boosts','assists','DBNOs']
+New_df_team = New_df_team.select([col for col in New_df_team.columns if col not in columns])
+
+################################################################################
+pj_sp_df_team = New_df_team.sample(withReplacement=False, fraction=0.1, seed=3)
+##
+#withColumn('solo',(fn.col('matchType') == 'solo').cast('int')).\
+pj_sp_df_team = pj_sp_df_team.\
+                    withColumn('duo',(fn.col('matchType') == 'duo').cast('int')).\
+                    withColumn('squad',(fn.col('matchType') == 'squad').cast('int'))
+pj_sp_df_team = pj_sp_df_team.drop('matchType')
+pj_sp_df_team.show(5)
+##############################################################################
+
+
+#####################################################################
+###############         Model Part       #############           
+#####################################################################
+#### Build a PCA Class
+class PCA:
+    def __init__(self,df):
+        self.df = df
+        self.inputcol = self.df.columns
+        self.inputcol.remove('winPlacePerc')
+    
+    def Pipe_line(self,k):
+         self.pipeline_PCA = Pipeline(stages=[
+                            feature.VectorAssembler(inputCols=self.inputcol,outputCol='features'),
+                            feature.StandardScaler(withMean=True,inputCol='features', outputCol='zfeatures'),
+                            feature.PCA(k=k, inputCol='zfeatures', outputCol='loadings')
+                            ]).fit(self.df)
+         return self.pipeline_PCA
+     
+    def PC(self):
+        self.principal_components = self.pipeline_PCA.stages[-1].pc.toArray()
+        self.pca_model = self.pipeline_PCA.stages[-1]
+        self.explainedVariance = self.pca_model.explainedVariance
+        return {'PC':self.principal_components,"Model":self.pca_model,"EV":self.explainedVariance}
+    
+    def choose(self,th = 0.98):
+        for i in range(0,1000):
+             if self.explainedVariance[i] < 0.01:
+                break
+        print ('best k = ', i-1)
+        self.sumEV = 0
+        for i in range(0,1000):
+             self.sumEV += self.explainedVariance[i]
+             if self.sumEV > th:
+                    break
+        print ('best k = ', i-1)     
+        plt.plot(np.cumsum(self.explainedVariance))
+        plt.xlabel('number of components')
+        plt.ylabel('cumulative explained variance')
+        
+##########################################################      
+##########    PCA  (solo)      #################### 
+solo_model = PCA(pj_sp_df_solo)
+solo_model.Pipe_line(20)
+solo_model.PC()
+solo_model.choose()
+##########         PC Results first two dimension
+pc1_pd =pd.DataFrame({'Feature': solo_model.inputcol, 'abs_loading': abs(solo_model.PC()['PC'][:,0])}).sort_values('abs_loading',ascending=False)
+pc2_pd =pd.DataFrame({'Feature': solo_model.inputcol, 'abs_loading': abs(solo_model.PC()['PC'][:,1])}).sort_values('abs_loading',ascending=False)
+PCA_choosed = solo_model.PC()['PC'][:,:15]
+##############      Reduced Dimension      #############################
+df = pj_sp_df_solo.drop('winPlacePerc')
+sp_np = df.toPandas().values
+pc_df_solo = np.dot(sp_np,PCA_choosed)
+pc_df_solo =pd.DataFrame(pc_df_solo)
+pc_df_solo.describe()
+##########################################################  
+
+##########    PCA  (team)      #################### 
+team_model = PCA(pj_sp_df_team)
+team_model.Pipe_line(20)
+team_model.PC()
+team_model.choose()
+##########         PC Results first two dimension
+pc1_pd =pd.DataFrame({'Feature': team_model.inputcol, 'abs_loading': abs(team_model.PC()['PC'][:,0])}).sort_values('abs_loading',ascending=False)
+pc2_pd =pd.DataFrame({'Feature': team_model.inputcol, 'abs_loading': abs(team_model.PC()['PC'][:,1])}).sort_values('abs_loading',ascending=False)
+PCA_choosed = solo_model.PC()['PC'][:,:15]
+##############      Reduced Dimension      #############################
+df = pj_sp_df_team.drop('winPlacePerc')
+sp_np = df.toPandas().values
+pc_df_team = np.dot(sp_np,PCA_choosed)
+pc_df_team =pd.DataFrame(pc_df_solo)
+pc_df_team.describe()
+##########################################################  
+
+
+#############
+training_df, validation_df, testing_df = pj_sp_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
+
+## Linear with Origin
+# RMSE Function
+rmse = fn.sqrt(fn.mean((fn.col('winPlacePerc')-fn.col('prediction'))**2)).alias("rmse")   
+def rmseLr(alpha,beta,maxiter = 100,fit_df = training_df, transform_df=validation_df):
+    lr =  LinearRegression().\
+        setLabelCol('winPlacePerc').\
+        setFeaturesCol('scaledFeatures').\
+        setRegParam(beta).\
+        setMaxIter(maxiter).\
+        setElasticNetParam(alpha)
+
+    pipe_Lr_og = Pipeline(stages = [
+      feature.VectorAssembler(inputCols = inputcol ,outputCol = 'feature'),
+      feature.StandardScaler(withMean=True,inputCol="feature", outputCol="scaledFeatures"),
+      lr
+      #LogisticRegression(featuresCol = "scaledFeatures", labelCol = 'winPlacePerc')
+      ]).fit(fit_df)
+
+    coeff = pipe_Lr_og.stages[2].coefficients.toArray()
+    coeffs_df = pd.DataFrame({'Features': inputcol, 'Coeffs': abs(coeff)})
+    coeffs_df.sort_values('Coeffs', ascending=False)
+    rmse3_df = pipe_Lr_og.transform(transform_df).select(rmse)
+    return {'rmse':rmse3_df.show(),'pipe_model':pipe_Lr_og}
+
+############################################################################3
+inputcol = pj_sp_df_team.columns
+inputcol.remove('winPlacePerc')
+### Model 1  With all input
+rmseLr(0,0)['rmse']
+### Model 2 
+rmseLr(1,0.1)['rmse']
+### Model 3 
+rmseLr(0,0.1)['rmse']
+### Model 4 
+rmseLr(0.5,0.1)['rmse']
+
+############### Model 1 is the best
+### Model 1
+rmseLr(0,0)['pipe_model'].transform(testing_df).select(rmse).show()
+train_summary = rmseLr(0,0)['pipe_model'].stages[-1].summary
+print("RMSE: %f" % train_summary.rootMeanSquaredError)
+print("r2: %f" % train_summary.r2)
+
+##############################################################
+inputcol = pj_sp_df_team.columns
+inputcol = [e for e in inputcol if e not in ['winPlacePerc', 'killPlace','killPoints','rankPoints']]
+
+##############################################################
+
+### Model 1  remove multicollineairity
+rmseLr(0,0)['rmse']
+### Model 2 
+rmseLr(1,0.1)['rmse']
+### Model 3 
+rmseLr(0,0.1)['rmse']
+### Model 4 
+rmseLr(0.5,0.1)['rmse']
+
+############### Model 1 is the best
+### Model 1
+rmseLr(0,0)['pipe_model'].transform(testing_df).select(rmse).show()
+train_summary = rmseLr(0,0)['pipe_model'].stages[-1].summary
+print("RMSE: %f" % train_summary.rootMeanSquaredError)
+print("r2: %f" % train_summary.r2)
