@@ -106,6 +106,19 @@ class PCA:
         plt.plot(np.cumsum(self.explainedVariance))
         plt.xlabel('number of components')
         plt.ylabel('cumulative explained variance')
+    
+    def Print_first2(self):
+        pc1_pd =pd.DataFrame({'Feature': self.inputcol, 'abs_loading': abs(self.principal_components[:,0])}).sort_values('abs_loading',ascending=False)
+        pc2_pd =pd.DataFrame({'Feature': self.inputcol, 'abs_loading': abs(self.principal_components[:,1])}).sort_values('abs_loading',ascending=False)
+        return {'pc1':pc1_pd,'pc2':pc2_pd}
+    
+    def reduced_dm(self,n):
+        PCA_choosed = self.principal_components[:,:n]
+        tpdf = self.df.drop('winPlacePerc')
+        sp_np = tpdf.toPandas().values
+        pc_df_solo = np.dot(sp_np,PCA_choosed)
+        pc_df_solo =pd.DataFrame(pc_df_solo)
+        return pc_df_solo
         
 ##########################################################      
 ##########    PCA  (solo)      #################### 
@@ -114,14 +127,10 @@ solo_model.Pipe_line(20)
 solo_model.PC()
 solo_model.choose()
 ##########         PC Results first two dimension
-pc1_pd =pd.DataFrame({'Feature': solo_model.inputcol, 'abs_loading': abs(solo_model.PC()['PC'][:,0])}).sort_values('abs_loading',ascending=False)
-pc2_pd =pd.DataFrame({'Feature': solo_model.inputcol, 'abs_loading': abs(solo_model.PC()['PC'][:,1])}).sort_values('abs_loading',ascending=False)
-PCA_choosed = solo_model.PC()['PC'][:,:15]
+pc1_pd = solo_model.Print_first2()['pc1']
+pc2_pd = solo_model.Print_first2()['pc2']
 ##############      Reduced Dimension      #############################
-df = pj_sp_df_solo.drop('winPlacePerc')
-sp_np = df.toPandas().values
-pc_df_solo = np.dot(sp_np,PCA_choosed)
-pc_df_solo =pd.DataFrame(pc_df_solo)
+pc_df_solo = solo_model.reduced_dm(15)
 pc_df_solo.describe()
 ##########################################################  
 
@@ -131,14 +140,10 @@ team_model.Pipe_line(20)
 team_model.PC()
 team_model.choose()
 ##########         PC Results first two dimension
-pc1_pd =pd.DataFrame({'Feature': team_model.inputcol, 'abs_loading': abs(team_model.PC()['PC'][:,0])}).sort_values('abs_loading',ascending=False)
-pc2_pd =pd.DataFrame({'Feature': team_model.inputcol, 'abs_loading': abs(team_model.PC()['PC'][:,1])}).sort_values('abs_loading',ascending=False)
-PCA_choosed = solo_model.PC()['PC'][:,:15]
+pc1_pd = team_model.Print_first2()['pc1']
+pc2_pd = team_model.Print_first2()['pc2']
 ##############      Reduced Dimension      #############################
-df = pj_sp_df_team.drop('winPlacePerc')
-sp_np = df.toPandas().values
-pc_df_team = np.dot(sp_np,PCA_choosed)
-pc_df_team =pd.DataFrame(pc_df_solo)
+pc_df_team = team_model.reduced_dm(16)
 pc_df_team.describe()
 ##########################################################  
 
