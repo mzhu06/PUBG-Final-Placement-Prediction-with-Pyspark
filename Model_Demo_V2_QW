@@ -145,16 +145,12 @@ pc2_pd = team_model.Print_first2()['pc2']
 ##############      Reduced Dimension      #############################
 pc_df_team = team_model.reduced_dm(16)
 pc_df_team.describe()
-##########################################################  
-
-
-#############
-training_df, validation_df, testing_df = pj_sp_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
-
+########################################################## 
+ 
 ## Linear with Origin
 # RMSE Function
 rmse = fn.sqrt(fn.mean((fn.col('winPlacePerc')-fn.col('prediction'))**2)).alias("rmse")   
-def rmseLr(alpha,beta,maxiter = 100,fit_df = training_df, transform_df=validation_df):
+def rmseLr(alpha, beta, fit_df, transform_df, test_df,maxiter = 100):
     lr =  LinearRegression().\
         setLabelCol('winPlacePerc').\
         setFeaturesCol('scaledFeatures').\
@@ -165,53 +161,83 @@ def rmseLr(alpha,beta,maxiter = 100,fit_df = training_df, transform_df=validatio
     pipe_Lr_og = Pipeline(stages = [
       feature.VectorAssembler(inputCols = inputcol ,outputCol = 'feature'),
       feature.StandardScaler(withMean=True,inputCol="feature", outputCol="scaledFeatures"),
-      lr
-      #LogisticRegression(featuresCol = "scaledFeatures", labelCol = 'winPlacePerc')
-      ]).fit(fit_df)
+      lr]).fit(fit_df)
 
     coeff = pipe_Lr_og.stages[2].coefficients.toArray()
     coeffs_df = pd.DataFrame({'Features': inputcol, 'Coeffs': abs(coeff)})
     coeffs_df.sort_values('Coeffs', ascending=False)
+    
+    ## rmse of validationdata
+    print('RMSE of Validation Data Set')
     rmse3_df = pipe_Lr_og.transform(transform_df).select(rmse)
-    return {'rmse':rmse3_df.show(),'pipe_model':pipe_Lr_og}
+    
+    ## Summary of testing data
+    train_summary = pipe_Lr_og.stages[-1].summary
+    print("Training RMSE: %f" % train_summary.rootMeanSquaredError)
+    print("Trainingr2: %f" % train_summary.r2)
+    
+    lr_predictions = pipe_Lr_og.transform(test_df)
+    lr_evaluator = RegressionEvaluator(predictionCol="prediction", \
+                 labelCol="winPlacePerc",metricName="r2")
+    
+    print("R Squared (R2) on test data = %g" % lr_evaluator.evaluate(lr_predictions))
+    
+    return {'rmse':rmse3_df.show(),'pipe_model':pipe_Lr_og,'Train_su': train_summary,'Test_model':lr_predictions}
 
 ############################################################################3
+
+##########     Linear Model of Team  Original Data  ############
+training_df, validation_df, testing_df = pj_sp_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
 inputcol = pj_sp_df_team.columns
 inputcol.remove('winPlacePerc')
-### Model 1  With all input
-rmseLr(0,0)['rmse']
-### Model 2 
-rmseLr(1,0.1)['rmse']
-### Model 3 
-rmseLr(0,0.1)['rmse']
-### Model 4 
-rmseLr(0.5,0.1)['rmse']
+##########       Model  Out put
+n = 0
+for i in np.arange(0.5,1.1,0.1):
+    for j in np.arange(0,0.2,0.1):
+        n+=1
+        print('Model:',n,'Alpha:',i,"Lambda: ",j)
+        rmseLr(i,j,training_df, validation_df, testing_df)
 
-############### Model 1 is the best
-### Model 1
-rmseLr(0,0)['pipe_model'].transform(testing_df).select(rmse).show()
-train_summary = rmseLr(0,0)['pipe_model'].stages[-1].summary
-print("RMSE: %f" % train_summary.rootMeanSquaredError)
-print("r2: %f" % train_summary.r2)
-
-##############################################################
-inputcol = pj_sp_df_team.columns
-inputcol = [e for e in inputcol if e not in ['winPlacePerc', 'killPlace','killPoints','rankPoints']]
-
-##############################################################
-
-### Model 1  remove multicollineairity
-rmseLr(0,0)['rmse']
-### Model 2 
-rmseLr(1,0.1)['rmse']
-### Model 3 
-rmseLr(0,0.1)['rmse']
-### Model 4 
-rmseLr(0.5,0.1)['rmse']
-
-############### Model 1 is the best
-### Model 1
-rmseLr(0,0)['pipe_model'].transform(testing_df).select(rmse).show()
-train_summary = rmseLr(0,0)['pipe_model'].stages[-1].summary
-print("RMSE: %f" % train_summary.rootMeanSquaredError)
-print("r2: %f" % train_summary.r2)
+############ Model is the best             ########################
+#         Model: 1 Alpha: 0.0 Lambda:  0.0
+#             RMSE of Validation Data Set
+#             Training RMSE: 0.129407
+#             Trainingr2: 0.822858
+#             R Squared (R2) on test data = 0.824897
+#             +-------------------+
+#             |               rmse|
+#             +-------------------+
+#             |0.12931329250256463|
+#             +-------------------+
+################################################################
+        
+##########     Linear Model of solo  Original Data  ############
+training_df, validation_df, testing_df = pj_sp_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
+inputcol = pj_sp_df_solo.columns
+inputcol.remove('winPlacePerc')
+##########       Model  Out put
+n = 0
+for i in np.arange(0,1.1,0.1):
+    if i == 0 or i == 1:
+        for j in np.arange(0,0.2,0.1):
+            n+=1
+            print('Model:',n,'Alpha:',i,"Lambda: ",j)
+            rmseLr(i,j,training_df, validation_df, testing_df)
+    else:
+        j = 0.1
+        n+=1
+        print('Model:',n,'Alpha:',i,"Lambda: ",j)
+        rmseLr(i,j,training_df, validation_df, testing_df)
+        
+############ Model is the best             ########################
+#         Model: 1 Alpha: 0.0 Lambda:  0.0
+#           RMSE of Validation Data Set
+#           Training RMSE: 0.104621
+#           Trainingr2: 0.877490
+#           R Squared (R2) on test data = 0.87965
+#           +-------------------+
+#           |               rmse|
+#           +-------------------+
+#           |0.10608384409927706|
+#           +-------------------+
+################################################################
