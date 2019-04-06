@@ -1,0 +1,142 @@
+Model: 1 Alpha: 0.0 Lambda:  0.0
+RMSE of Validation Data Set
+Training RMSE: 0.104621
+Trainingr2: 0.877490
+R Squared (R2) on test data = 0.87965
++-------------------+
+|               rmse|
++-------------------+
+|0.10608384409927706|
++-------------------+
+
+Model: 2 Alpha: 0.0 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.127422
+Trainingr2: 0.818274
+R Squared (R2) on test data = 0.819152
++-------------------+
+|               rmse|
++-------------------+
+|0.12968817203700797|
++-------------------+
+
+Model: 3 Alpha: 0.1 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.133414
+Trainingr2: 0.800782
+R Squared (R2) on test data = 0.800115
++-------------------+
+|               rmse|
++-------------------+
+|0.13531297464253875|
++-------------------+
+
+Model: 4 Alpha: 0.2 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.139264
+Trainingr2: 0.782926
+R Squared (R2) on test data = 0.780841
++------------------+
+|              rmse|
++------------------+
+|0.1408026440887956|
++------------------+
+
+Model: 5 Alpha: 0.30000000000000004 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.145994
+Trainingr2: 0.761441
+R Squared (R2) on test data = 0.758291
++-------------------+
+|               rmse|
++-------------------+
+|0.14720075521988815|
++-------------------+
+
+Model: 6 Alpha: 0.4 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.151806
+Trainingr2: 0.742069
+R Squared (R2) on test data = 0.738569
++-------------------+
+|               rmse|
++-------------------+
+|0.15269937958353882|
++-------------------+
+
+Model: 7 Alpha: 0.5 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.155698
+Trainingr2: 0.728671
+R Squared (R2) on test data = 0.725788
++------------------+
+|              rmse|
++------------------+
+|0.1562647007802303|
++------------------+
+
+Model: 8 Alpha: 0.6000000000000001 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.160199
+Trainingr2: 0.712759
+R Squared (R2) on test data = 0.710477
++-------------------+
+|               rmse|
++-------------------+
+|0.16046539477885943|
++-------------------+
+
+Model: 9 Alpha: 0.7000000000000001 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.165331
+Trainingr2: 0.694061
+R Squared (R2) on test data = 0.692358
++-------------------+
+|               rmse|
++-------------------+
+|0.16533115404393292|
++-------------------+
+
+Model: 10 Alpha: 0.8 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.170800
+Trainingr2: 0.673485
+R Squared (R2) on test data = 0.672264
++-------------------+
+|               rmse|
++-------------------+
+|0.17057661964750218|
++-------------------+
+
+Model: 11 Alpha: 0.9 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.176422
+Trainingr2: 0.651637
+R Squared (R2) on test data = 0.650734
++-------------------+
+|               rmse|
++-------------------+
+|0.17602969173327404|
++-------------------+
+
+Model: 12 Alpha: 1.0 Lambda:  0.0
+RMSE of Validation Data Set
+Training RMSE: 0.104621
+Trainingr2: 0.877490
+R Squared (R2) on test data = 0.87965
++-------------------+
+|               rmse|
++-------------------+
+|0.10608384409927706|
++-------------------+
+
+Model: 13 Alpha: 1.0 Lambda:  0.1
+RMSE of Validation Data Set
+Training RMSE: 0.181168
+Trainingr2: 0.632639
+R Squared (R2) on test data = 0.631816
++-------------------+
+|               rmse|
++-------------------+
+|0.18072968351386592|
++-------------------+
