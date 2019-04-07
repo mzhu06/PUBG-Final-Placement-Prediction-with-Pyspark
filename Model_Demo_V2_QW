@@ -185,19 +185,27 @@ def rmseLr(alpha, beta, fit_df, transform_df, test_df,maxiter = 100):
     return {'rmse':rmse3_df.show(),'pipe_model':pipe_Lr_og,'Train_su': train_summary,'Test_model':lr_predictions}
 
 ############################################################################3
+def runModel():
+    n = 0
+    for i in np.arange(0,1.1,0.1):
+       if i == 0 or i == 1:
+          for j in np.arange(0,0.2,0.1):
+            n+=1
+            print('Model:',n,'Alpha:',i,"Lambda: ",j)
+            rmseLr(i,j,training_df, validation_df, testing_df)
+       else:
+           j = 0.1
+           n+=1
+           print('Model:',n,'Alpha:',i,"Lambda: ",j)
+           rmseLr(i,j,training_df, validation_df, testing_df)
 
+############################################################################3
 ##########     Linear Model of Team  Original Data  ############
 training_df, validation_df, testing_df = pj_sp_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
 inputcol = pj_sp_df_team.columns
 inputcol.remove('winPlacePerc')
 ##########       Model  Out put
-n = 0
-for i in np.arange(0.5,1.1,0.1):
-    for j in np.arange(0,0.2,0.1):
-        n+=1
-        print('Model:',n,'Alpha:',i,"Lambda: ",j)
-        rmseLr(i,j,training_df, validation_df, testing_df)
-
+runModel()
 ############ Model is the best             ########################
 #         Model: 1 Alpha: 0.0 Lambda:  0.0
 #             RMSE of Validation Data Set
@@ -216,19 +224,7 @@ training_df, validation_df, testing_df = pj_sp_df_solo.randomSplit([0.6, 0.3, 0.
 inputcol = pj_sp_df_solo.columns
 inputcol.remove('winPlacePerc')
 ##########       Model  Out put
-n = 0
-for i in np.arange(0,1.1,0.1):
-    if i == 0 or i == 1:
-        for j in np.arange(0,0.2,0.1):
-            n+=1
-            print('Model:',n,'Alpha:',i,"Lambda: ",j)
-            rmseLr(i,j,training_df, validation_df, testing_df)
-    else:
-        j = 0.1
-        n+=1
-        print('Model:',n,'Alpha:',i,"Lambda: ",j)
-        rmseLr(i,j,training_df, validation_df, testing_df)
-        
+runModel()
 ############ Model is the best             ########################
 #         Model: 1 Alpha: 0.0 Lambda:  0.0
 #           RMSE of Validation Data Set
@@ -241,3 +237,35 @@ for i in np.arange(0,1.1,0.1):
 #           |0.10608384409927706|
 #           +-------------------+
 ################################################################
+#############       PCA Linear Model     ###################
+pc_sp_df_team = spark.createDataFrame(pc_df_team)
+pc_sp_df_team.withColumn('winPlacePerc',pj_sp_df_team['winPlacePerc'])
+
+#############################################################
+#Combine pc dataframe with column 'winPlacePerc'
+def combinedf(pc_df, pj_sp_df):
+    pc_df1 =  spark.createDataFrame(pc_df)
+    pc_df1=pc_df1.withColumn('index',fn.monotonically_increasing_id())
+    pj_sp_df1 = pj_sp_df.select('winPlacePerc').withColumn('index',fn.monotonically_increasing_id())
+    join_df = pc_df1.join(pj_sp_df1, on=['index'])
+    return(join_df)
+##############################################################
+##########     Linear Model of Solo  PCA Data  ############
+##########       Model  Out put
+join_pc_df_solo = combinedf(pc_df_solo,pj_sp_df_solo)
+inputcol = list(join_pc_df_solo.columns)
+inputcol.remove('winPlacePerc')
+inputcol.remove('index')
+training_df, validation_df, testing_df = join_pc_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
+##############################################################
+runModel()     
+##############################################################
+##########     Linear Model of Team  PCA Data  ############
+##########       Model  Out put
+join_pc_df_team = combinedf(pc_df_team,pj_sp_df_team)
+inputcol = list(join_pc_df_team.columns)
+inputcol.remove('winPlacePerc')
+inputcol.remove('index')
+training_df, validation_df, testing_df = join_pc_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
+##########       Model  Out put
+runModel()
