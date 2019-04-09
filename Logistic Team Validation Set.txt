@@ -1,0 +1,26 @@
+Model: 1 Alpha: 0.0 Lambda:  0.0
+Test Error = 0.588334 Accuracy = 0.411666
+Model: 2 Alpha: 0.0 Lambda:  0.1
+Test Error = 0.588334 Accuracy = 0.411666
+Model: 3 Alpha: 0.1 Lambda:  0.1
+Test Error = 0.712675 Accuracy = 0.287325
+Model: 4 Alpha: 0.2 Lambda:  0.1
+Test Error = 0.736202 Accuracy = 0.263798
+Model: 5 Alpha: 0.30000000000000004 Lambda:  0.1
+Test Error = 0.746667 Accuracy = 0.253333
+Model: 6 Alpha: 0.4 Lambda:  0.1
+Test Error = 0.755925 Accuracy = 0.244075
+Model: 7 Alpha: 0.5 Lambda:  0.1
+Test Error = 0.764537 Accuracy = 0.235463
+Model: 8 Alpha: 0.6000000000000001 Lambda:  0.1
+Test Error = 0.767478 Accuracy = 0.232522
+Model: 9 Alpha: 0.7000000000000001 Lambda:  0.1
+Test Error = 0.770644 Accuracy = 0.229356
+Model: 10 Alpha: 0.8 Lambda:  0.1
+Test Error = 0.777569 Accuracy = 0.222431
+Model: 11 Alpha: 0.9 Lambda:  0.1
+Test Error = 0.789489 Accuracy = 0.210511
+Model: 12 Alpha: 1.0 Lambda:  0.0
+Test Error = 0.762729 Accuracy = 0.237271
+Model: 13 Alpha: 1.0 Lambda:  0.1
+Test Error = 0.814487 Accuracy = 0.185513
