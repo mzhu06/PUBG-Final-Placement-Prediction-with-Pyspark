@@ -68,7 +68,13 @@ pj_sp_df_team = pj_sp_df_team.\
 pj_sp_df_team = pj_sp_df_team.drop('matchType')
 pj_sp_df_team.show(5)
 ##############################################################################
-
+##############################################################################
+# Full Data if needed
+#pj_sp_df_solo = New_df_solo
+#pj_sp_df_team = New_df_team.\
+#                    withColumn('duo',(fn.col('matchType') == 'duo').cast('int')).\
+#                    withColumn('squad',(fn.col('matchType') == 'squad').cast('int'))
+#pj_sp_df_team = pj_sp_df_team.drop('matchType')
 
 #####################################################################
 ###############         Model Part       #############           
