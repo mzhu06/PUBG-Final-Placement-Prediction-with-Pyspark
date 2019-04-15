@@ -1,26 +1,39 @@
 Model: 1 Alpha: 0.0 Lambda:  0.0
-Test Error = 0.448238 Accuracy = 0.551762
+Validate Error = 0.448238 Accuracy = 0.551762
+Test Error = 0.436294 Accuracy = 0.563706
 Model: 2 Alpha: 0.0 Lambda:  0.1
-Test Error = 0.448238 Accuracy = 0.551762
+Validate Error = 0.448238 Accuracy = 0.551762
+Test Error = 0.436294 Accuracy = 0.563706
 Model: 3 Alpha: 0.1 Lambda:  0.1
-Test Error = 0.680937 Accuracy = 0.319063
+Validate Error = 0.680937 Accuracy = 0.319063
+Test Error = 0.683728 Accuracy = 0.316272
 Model: 4 Alpha: 0.2 Lambda:  0.1
-Test Error = 0.71134 Accuracy = 0.28866
+Validate Error = 0.71134 Accuracy = 0.28866
+Test Error = 0.714247 Accuracy = 0.285753
 Model: 5 Alpha: 0.30000000000000004 Lambda:  0.1
-Test Error = 0.739481 Accuracy = 0.260519
+Validate Error = 0.739481 Accuracy = 0.260519
+Test Error = 0.740386 Accuracy = 0.259614
 Model: 6 Alpha: 0.4 Lambda:  0.1
-Test Error = 0.755259 Accuracy = 0.244741
+Validate Error = 0.755259 Accuracy = 0.244741
+Test Error = 0.757219 Accuracy = 0.242781
 Model: 7 Alpha: 0.5 Lambda:  0.1
-Test Error = 0.769099 Accuracy = 0.230901
+Validate Error = 0.769099 Accuracy = 0.230901
+Test Error = 0.770494 Accuracy = 0.229506
 Model: 8 Alpha: 0.6000000000000001 Lambda:  0.1
-Test Error = 0.776665 Accuracy = 0.223335
+Validate Error = 0.776665 Accuracy = 0.223335
+Test Error = 0.777884 Accuracy = 0.222116
 Model: 9 Alpha: 0.7000000000000001 Lambda:  0.1
-Test Error = 0.782202 Accuracy = 0.217798
+Validate Error = 0.782202 Accuracy = 0.217798
+Test Error = 0.782264 Accuracy = 0.217736
 Model: 10 Alpha: 0.8 Lambda:  0.1
-Test Error = 0.7852 Accuracy = 0.2148
+Validate Error = 0.7852 Accuracy = 0.2148
+Test Error = 0.785685 Accuracy = 0.214315
 Model: 11 Alpha: 0.9 Lambda:  0.1
-Test Error = 0.788614 Accuracy = 0.211386
+Validate Error = 0.788614 Accuracy = 0.211386
+Test Error = 0.789927 Accuracy = 0.210073
 Model: 12 Alpha: 1.0 Lambda:  0.0
-Test Error = 0.766239 Accuracy = 0.233761
+Validate Error = 0.766239 Accuracy = 0.233761
+Test Error = 0.764609 Accuracy = 0.235391
 Model: 13 Alpha: 1.0 Lambda:  0.1
-Test Error = 0.795119 Accuracy = 0.204881
+Validate Error = 0.795119 Accuracy = 0.204881
+Test Error = 0.796086 Accuracy = 0.203914
