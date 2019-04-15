@@ -340,11 +340,12 @@ training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.
 mlp = classification.MultilayerPerceptronClassifier(seed=0).\
     setStepSize(0.2).\
     setMaxIter(100).\
-    setLabelCol('features').\
-    setFeaturesCol('rank').\
-    setLayers([20*1,10, 10])
+    setLabelCol('rank').\
+    setFeaturesCol('features').\
+    setLayers([24*1,10, 10])
     
 va =  feature.VectorAssembler(inputCols=inputcol, outputCol='features')   
+
 
 pipe_mlp=Pipeline(stages=[va, mlp]).fit(training_df)
 
@@ -354,18 +355,22 @@ predictions = pipe_mlp.transform(validation_df)
 accuracy = evaluator.evaluate(predictions)
 
 ####################################################################################
-training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
+training_df, validation_df, testing_df = pj_sp_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
+inputcol = pj_sp_df_team.columns
+inputcol.remove('winPlacePerc')
+
 gbr = regression.GBTRegressor(seed=0).\
     setMaxIter(100).\
-    setLabelCol('features').\
-    setFeaturesCol('rank')
+    setLabelCol('winPlacePerc').\
+    setFeaturesCol('features')
     
 va =  feature.VectorAssembler(inputCols=inputcol, outputCol='features')   
 
+
 pipe_gbr=Pipeline(stages=[va, gbr]).fit(training_df)
 
-evaluator = evaluation.MulticlassClassificationEvaluator(labelCol='rank', predictionCol="prediction",metricName="accuracy")
+evaluator = evaluation.RegressionEvaluator(labelCol='winPlacePerc', metricName='r2')
 
 predictions = pipe_gbr.transform(validation_df)
-accuracy = evaluator.evaluate(predictions)
-
+R2_gbr = evaluator.evaluate(predictions)
+print("Performance of GBR: ", R2_gbr)
