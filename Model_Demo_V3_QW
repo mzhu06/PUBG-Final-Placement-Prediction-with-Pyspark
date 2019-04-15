@@ -319,6 +319,20 @@ def logitReg(reg,elastic,training,validate,test):
     accuracy = evaluator.evaluate(predictions)
     print("Test Error = %g" % (1.0 - accuracy),"Accuracy = %g" % (accuracy))
 ##################################################
+###################    
+#def runLgModel():
+#    n = 0
+#    for i in np.arange(0,1.1,0.1):
+#       if i == 0 or i == 1:
+#          for j in np.arange(0,0.2,0.1):
+#            n+=1
+#            print('Model:',n,'Alpha:',i,"Lambda: ",j)
+#            logitReg(i,j,training_df, validation_df)
+#       else:
+#           j = 0.1
+#           n+=1
+#           print('Model:',n,'Alpha:',i,"Lambda: ",j)
+#           logitReg(i,j,training_df, validation_df)
 ###################  
 runModel(logitReg,training_df, validation_df, testing_df)
 #####################################################################
@@ -344,23 +358,71 @@ evaluator = evaluation.MulticlassClassificationEvaluator(labelCol='rank', predic
 predictions = pipe_mlp.transform(validation_df)
 accuracy = evaluator.evaluate(predictions)
 
+################           customer input dat              #########################
+columns = pj_sp_df_team.columns
+pj_sp_df_team.printSchema()
+#root
+# |-- total_team_damage: double (nullable = true)
+# |-- total_team_kills: long (nullable = true)
+# |-- team_kill_points: long (nullable = true)
+# |-- team_kill_rank: double (nullable = true)
+# |-- team_normal_rank: double (nullable = true)
+# |-- team_revives: long (nullable = true)
+# |-- team_boosts: long (nullable = true)
+# |-- total_assists: long (nullable = true)
+# |-- team_DBNOs: long (nullable = true)
+# |-- totalDistance: double (nullable = true)
+# |-- damageDealt: double (nullable = true)
+# |-- headshotKills: integer (nullable = true)
+# |-- heals: integer (nullable = true)
+# |-- killPoints: integer (nullable = true)
+# |-- killStreaks: integer (nullable = true)
+# |-- longestKill: double (nullable = true)
+# |-- matchDuration: integer (nullable = true)
+# |-- maxPlace: integer (nullable = true)
+# |-- teamKills: integer (nullable = true)
+# |-- vehicleDestroys: integer (nullable = true)
+# |-- weaponsAcquired: integer (nullable = true)
+# |-- winPoints: integer (nullable = true)
+# |-- winPlacePerc: double (nullable = true)
+# |-- duo: integer (nullable = false)
+# |-- squad: integer (nullable = false)
+newRow = newRow = spark.createDataFrame([], columns)
+appended = pj_sp_df_team.union(newRow)
+appended.show()
+
+
 ####################################################################################
 training_df, validation_df, testing_df = pj_sp_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
 inputcol = pj_sp_df_team.columns
 inputcol.remove('winPlacePerc')
 
-gbr = regression.GBTRegressor(seed=0).\
-    setMaxIter(100).\
-    setLabelCol('winPlacePerc').\
-    setFeaturesCol('features')
+def gbr(training_df,validation_df, testing_df):
+    gbr = regression.GBTRegressor(seed=0).\
+          setMaxIter(100).\
+          setLabelCol('winPlacePerc').\
+          setFeaturesCol('features')
     
-va =  feature.VectorAssembler(inputCols=inputcol, outputCol='features')   
+    va =  feature.VectorAssembler(inputCols=inputcol, outputCol='features')   
 
+    pipe_gbr=Pipeline(stages=[va, gbr]).fit(training_df)
 
-pipe_gbr=Pipeline(stages=[va, gbr]).fit(training_df)
+    evaluator = evaluation.RegressionEvaluator(labelCol='winPlacePerc', metricName='r2')
 
-evaluator = evaluation.RegressionEvaluator(labelCol='winPlacePerc', metricName='r2')
+    predictions = pipe_gbr.transform(validation_df)
+    R2_gbr = evaluator.evaluate(predictions)
+    print("Performance of GBR(validation): ", R2_gbr)
+    
+    predictions = pipe_gbr.transform(testing_df)
+    R2_gbr = evaluator.evaluate(predictions)
+    print("Performance of GBR(testing): ", R2_gbr)
 
-predictions = pipe_gbr.transform(validation_df)
-R2_gbr = evaluator.evaluate(predictions)
-print("Performance of GBR: ", R2_gbr)
+####################################################################################    
+gbr(training_df,validation_df, testing_df )
+####################################################################################
+training_df, validation_df, testing_df = pj_sp_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
+inputcol = pj_sp_df_solo.columns
+inputcol.remove('winPlacePerc')
+
+####################################################################################    
+gbr(training_df,validation_df, testing_df )
