@@ -55,7 +55,7 @@ New_df_team  = New_df_team.join(Full_data,New_df_team .groupId == Full_data.grou
 
 
 ##
-columns = ['Id','groupId','matchId', 'roadKills','numGroups','rideDistance','walkDistance','swimDistance','kills','killPints','killPlace','rankPoints','revives','boosts','assists','DBNOs']
+columns = ['Id','groupId','matchId', 'roadKills','numGroups','rideDistance','walkDistance','swimDistance','kills','killPints','killPlace','rankPoints','revives','boosts','assists','DBNOs','damageDealt']
 New_df_team = New_df_team.select([col for col in New_df_team.columns if col not in columns])
 
 ################################################################################
@@ -67,7 +67,6 @@ pj_sp_df_team = pj_sp_df_team.\
                     withColumn('squad',(fn.col('matchType') == 'squad').cast('int'))
 pj_sp_df_team = pj_sp_df_team.drop('matchType')
 pj_sp_df_team.show(5)
-##############################################################################
 ##############################################################################
 # Full Data if needed
 #pj_sp_df_solo = New_df_solo
@@ -345,24 +344,6 @@ runModel(logitReg,training_df, validation_df, testing_df)
 training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
 ###################  
 runModel(logitReg,training_df, validation_df, testing_df)
-####################################################################################
-training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
-mlp = classification.MultilayerPerceptronClassifier(seed=0).\
-    setStepSize(0.2).\
-    setMaxIter(100).\
-    setLabelCol('rank').\
-    setFeaturesCol('features').\
-    setLayers([24*1,10, 10])
-    
-va =  feature.VectorAssembler(inputCols=inputcol, outputCol='features')   
-
-
-pipe_mlp=Pipeline(stages=[va, mlp]).fit(training_df)
-
-evaluator = evaluation.MulticlassClassificationEvaluator(labelCol='rank', predictionCol="prediction",metricName="accuracy")
-
-predictions = pipe_mlp.transform(validation_df)
-accuracy = evaluator.evaluate(predictions)
 
 ################           customer input dat              #########################
 columns = pj_sp_df_team.columns
@@ -432,3 +413,95 @@ inputcol.remove('winPlacePerc')
 
 ####################################################################################    
 gbr(training_df,validation_df, testing_df )
+
+#######################################################
+##########     Randrom Forest of Solo Data  ###########
+from pyspark.ml.regression import RandomForestRegressor
+
+
+rf_solo_df = pj_sp_df_solo
+# rf_solo_df.withColumnRenamed('winPlacePerc', 'label')
+inputcols = rf_solo_df.columns
+inputcols.remove('winPlacePerc')
+
+#split data into train, validation and test
+training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
+
+#stages
+from pyspark.ml.feature import VectorAssembler
+va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
+rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
+    setFeaturesCol('features')
+
+# Chain indexer and forest in a Pipeline
+rf_pipeline1 = Pipeline(stages=[va1, rf1])
+
+# Train model.  This also runs the indexer.
+rf_model1 = rf_pipeline1.fit(training_df)
+
+#Test on validation dataset
+predictions1 = rf_model1.transform(validation_df)
+
+#select example rows to display
+predictions1.select('prediction', 'winPlacePerc','features').show(5)
+
+# validation error
+# Select (prediction, true label) and compute test error
+evaluator = RegressionEvaluator(labelCol='winPlacePerc', predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(predictions1)
+print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+
+
+#################################################################
+##########     Randrom Forest of Team  Original Data  ###########
+
+rf_team_df = pj_sp_df_team
+#rf_team_df.withColumnRenamed('winPlacePerc', 'label')
+inputcols = rf_team_df.columns
+inputcols.remove('winPlacePerc')
+
+#split data into train, validation and test
+training_df, validation_df, testing_df = rf_team_df.randomSplit([0.6, 0.3, 0.1], seed=0)
+
+#stages
+from pyspark.ml.feature import VectorAssembler
+va2 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
+rf2 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
+    setFeaturesCol('features')
+
+# Chain indexer and forest in a Pipeline
+rf_pipeline2 = Pipeline(stages=[va2, rf2])
+
+# Train model.  This also runs the indexer.
+rf_model2 = rf_pipeline2.fit(training_df)
+
+#Test on validation dataset
+predictions2 = rf_model2.transform(validation_df)
+
+#select example rows to display
+predictions2.select('prediction', 'winPlacePerc','features').show(5)
+
+# validation error
+# Select (prediction, true label) and compute test error
+rmse = evaluator.evaluate(predictions2)
+print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+
+
+####################################################################################
+training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
+mlp = classification.MultilayerPerceptronClassifier(seed=0).\
+    setStepSize(0.2).\
+    setMaxIter(100).\
+    setLabelCol('rank').\
+    setFeaturesCol('features').\
+    setLayers([24*1,10, 10])
+    
+va =  feature.VectorAssembler(inputCols=inputcol, outputCol='features')   
+
+
+pipe_mlp=Pipeline(stages=[va, mlp]).fit(training_df)
+
+evaluator = evaluation.MulticlassClassificationEvaluator(labelCol='rank', predictionCol="prediction",metricName="accuracy")
+
+predictions = pipe_mlp.transform(validation_df)
+accuracy = evaluator.evaluate(predictions)
