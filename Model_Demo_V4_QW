@@ -403,6 +403,17 @@ def gbr(training_df,validation_df, testing_df):
     predictions = pipe_gbr.transform(testing_df)
     R2_gbr = evaluator.evaluate(predictions)
     print("Performance of GBR(testing): ", R2_gbr)
+    
+    # RMSE
+    evaluator = evaluation.RegressionEvaluator(labelCol='winPlacePerc', predictionCol='predictions',metricName='rmse')
+
+    predictions = pipe_gbr.transform(validation_df)
+    RMSE_gbr = evaluator.evaluate(predictions)
+    print("Performance of GBR(validation): ", RMSE_gbr)
+    
+    predictions = pipe_gbr.transform(testing_df)
+    RMSE_gbr = evaluator.evaluate(predictions)
+    print("Performance of GBR(testing): ", RMSE_gbr)
 
 ####################################################################################    
 gbr(training_df,validation_df, testing_df )
