@@ -450,8 +450,12 @@ predictions1.select('prediction', 'winPlacePerc','features').show(5)
 # Select (prediction, true label) and compute test error
 evaluator = RegressionEvaluator(labelCol='winPlacePerc', predictionCol="prediction", metricName="rmse")
 rmse = evaluator.evaluate(predictions1)
-print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+print("Root Mean Squared Error (RMSE) on validation data of rm_model1 = %g" % rmse)
 
+#feature importances
+rf_model1 = rf_model1.stages[-1]
+print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model1.featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight'))
 
 #################################################################
 ##########     Randrom Forest of Team  Original Data  ###########
@@ -484,7 +488,12 @@ predictions2.select('prediction', 'winPlacePerc','features').show(5)
 # validation error
 # Select (prediction, true label) and compute test error
 rmse = evaluator.evaluate(predictions2)
-print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+print("Root Mean Squared Error (RMSE) on validation data of rf_model2 = %g" % rmse)
+
+#feature importances
+rf_model2 = rf_model2.stages[-1]
+print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model2.featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight'))
 
 
 ####################################################################################
