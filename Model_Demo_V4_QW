@@ -67,8 +67,8 @@ pj_sp_df_team = pj_sp_df_team.\
                     withColumn('squad',(fn.col('matchType') == 'squad').cast('int'))
 pj_sp_df_team = pj_sp_df_team.drop('matchType')
 pj_sp_df_team.show(5)
-##############################################################################
-# Full Data if needed
+###############################################################################
+##Full Data if needed
 #pj_sp_df_solo = New_df_solo
 #pj_sp_df_team = New_df_team.\
 #                    withColumn('duo',(fn.col('matchType') == 'duo').cast('int')).\
@@ -137,7 +137,7 @@ solo_model.choose()
 pc1_pd = solo_model.Print_first2()['pc1']
 pc2_pd = solo_model.Print_first2()['pc2']
 ##############      Reduced Dimension      #############################
-pc_df_solo = solo_model.reduced_dm(15)
+pc_df_solo = solo_model.reduced_dm(16)
 pc_df_solo.describe()
 ##########################################################  
 
@@ -489,14 +489,37 @@ print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
 
 ####################################################################################
 training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
+inputcols =  pj_lg_df_solo.columns
+inputcols.remove('rank')
 mlp = classification.MultilayerPerceptronClassifier(seed=0).\
     setStepSize(0.2).\
     setMaxIter(100).\
     setLabelCol('rank').\
     setFeaturesCol('features').\
-    setLayers([24*1,10, 10])
+    setLayers([24,10, 10])
     
-va =  feature.VectorAssembler(inputCols=inputcol, outputCol='features')   
+va =  feature.VectorAssembler(inputCols=inputcols, outputCol='features')   
+
+
+pipe_mlp=Pipeline(stages=[va, mlp]).fit(training_df)
+
+evaluator = evaluation.MulticlassClassificationEvaluator(labelCol='rank', predictionCol="prediction",metricName="accuracy")
+
+predictions = pipe_mlp.transform(validation_df)
+accuracy = evaluator.evaluate(predictions)
+
+####################################################################################
+training_df, validation_df, testing_df = pj_lg_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
+inputcols =  pj_lg_df_team.columns
+inputcols.remove('rank')
+mlp = classification.MultilayerPerceptronClassifier(seed=0).\
+    setStepSize(0.2).\
+    setMaxIter(100).\
+    setLabelCol('rank').\
+    setFeaturesCol('features').\
+    setLayers([23,10, 10])
+    
+va =  feature.VectorAssembler(inputCols=inputcols, outputCol='features')   
 
 
 pipe_mlp=Pipeline(stages=[va, mlp]).fit(training_df)
