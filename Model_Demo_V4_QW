@@ -528,7 +528,7 @@ predictions1.select('prediction', 'winPlacePerc','features').show(5)
 
 # validation error
 # Select (prediction, true label) and compute test error
-rmse = evaluator.evaluate(predictions2)
+rmse = evaluator.evaluate(predictions1)
 print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
 
 pd.DataFrame(list(zip(inputcols, rf_model1.stages[-1].featureImportances.toArray())),
