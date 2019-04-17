@@ -426,7 +426,8 @@ pd.DataFrame(list(zip(inputcol, gbr_solo.stages[-1].featureImportances.toArray()
 #######################################################
 ##########     Randrom Forest of Solo Data  ###########
 from pyspark.ml.regression import RandomForestRegressor
-
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.evaluation import RegressionEvaluator
 
 rf_solo_df = pj_sp_df_solo
 # rf_solo_df.withColumnRenamed('winPlacePerc', 'label')
@@ -437,7 +438,6 @@ inputcols.remove('winPlacePerc')
 training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
 
 #stages
-from pyspark.ml.feature import VectorAssembler
 va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
 rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
     setFeaturesCol('features')
@@ -460,6 +460,11 @@ evaluator = RegressionEvaluator(labelCol='winPlacePerc', predictionCol="predicti
 rmse = evaluator.evaluate(predictions1)
 print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
 
+#feature interpretations
+rf_model1 = rf_model1.stages[-1]
+print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model1.featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight'))
+
 
 #################################################################
 ##########     Randrom Forest of Team  Original Data  ###########
@@ -473,7 +478,6 @@ inputcols.remove('winPlacePerc')
 training_df, validation_df, testing_df = rf_team_df.randomSplit([0.6, 0.3, 0.1], seed=0)
 
 #stages
-from pyspark.ml.feature import VectorAssembler
 va2 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
 rf2 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
     setFeaturesCol('features')
@@ -495,8 +499,12 @@ predictions2.select('prediction', 'winPlacePerc','features').show(5)
 rmse = evaluator.evaluate(predictions2)
 print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
 
-pd.DataFrame(list(zip(inputcols, rf_model2.stages[-1].featureImportances.toArray())),
-            columns = ['column', 'weight']).sort_values('weight')
+#feature interpretations
+rf_model2 = rf_model2.stages[-1]
+print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model2.featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight'))
+
+           
 
 ##########     Randrom Forest of solo  Original Data  ###########
 
