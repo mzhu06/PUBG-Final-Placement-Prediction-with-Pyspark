@@ -395,24 +395,33 @@ def gbr(training_df,validation_df, testing_df):
     pipe_gbr=Pipeline(stages=[va, gbr]).fit(training_df)
 
     evaluator = evaluation.RegressionEvaluator(labelCol='winPlacePerc', metricName='r2')
+    evaluator2 = evaluation.RegressionEvaluator(labelCol='winPlacePerc', predictionCol="prediction", metricName="rmse")
 
     predictions = pipe_gbr.transform(validation_df)
     R2_gbr = evaluator.evaluate(predictions)
-    print("Performance of GBR(validation): ", R2_gbr)
+    rmse = evaluator2.evaluate(predictions)
+    print("Performance of GBR(validation): ", R2_gbr,"Performance of GBR(validation): ", rmse)
     
     predictions = pipe_gbr.transform(testing_df)
     R2_gbr = evaluator.evaluate(predictions)
-    print("Performance of GBR(testing): ", R2_gbr)
+    rmse = evaluator2.evaluate(predictions)
+    print("Performance of GBR(testing): ", R2_gbr,"Performance of GBR(testing): ", rmse)
+    return pipe_gbr
 
 ####################################################################################    
-gbr(training_df,validation_df, testing_df )
+gbr_team = gbr(training_df,validation_df, testing_df )
+pd.DataFrame(list(zip(inputcol, gbr_team.stages[-1].featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight')
+
 ####################################################################################
 training_df, validation_df, testing_df = pj_sp_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
 inputcol = pj_sp_df_solo.columns
 inputcol.remove('winPlacePerc')
 
 ####################################################################################    
-gbr(training_df,validation_df, testing_df )
+gbr_solo = gbr(training_df,validation_df, testing_df )
+pd.DataFrame(list(zip(inputcol, gbr_solo.stages[-1].featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight')
 
 #######################################################
 ##########     Randrom Forest of Solo Data  ###########
