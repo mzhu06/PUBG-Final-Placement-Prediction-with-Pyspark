@@ -385,7 +385,9 @@ inputcol = pj_sp_df_team.columns
 inputcol.remove('winPlacePerc')
 
 def gbr(training_df,validation_df, testing_df):
-    gbr = regression.GBTRegressor(seed=0).\
+    #gbr = regression.GBTRegressor(seed=0,stepSize=0.03,minInfoGain = 0.5,minInstancesPerNode =10).\
+    #gbr = regression.GBTRegressor(seed=0,stepSize=0.01).\
+    gbr = regression.GBTRegressor(seed=0,stepSize=0.03).\
           setMaxIter(100).\
           setLabelCol('winPlacePerc').\
           setFeaturesCol('features')
@@ -400,12 +402,17 @@ def gbr(training_df,validation_df, testing_df):
     predictions = pipe_gbr.transform(validation_df)
     R2_gbr = evaluator.evaluate(predictions)
     rmse = evaluator2.evaluate(predictions)
-    print("Performance of GBR(validation): ", R2_gbr,"Performance of GBR(validation): ", rmse)
+    print("Performance of GBR(validate) R2: ", R2_gbr)
+    print("---------------------------------------")
+    print("Performance of GBR(validate) RMSE: ", rmse)
     
     predictions = pipe_gbr.transform(testing_df)
     R2_gbr = evaluator.evaluate(predictions)
     rmse = evaluator2.evaluate(predictions)
-    print("Performance of GBR(testing): ", R2_gbr,"Performance of GBR(testing): ", rmse)
+    print("---------------------------------------")
+    print("Performance of GBR(testing) R2: ", R2_gbr)
+    print("---------------------------------------")
+    print("Performance of GBR(testing) RMSE: ", rmse)
     return pipe_gbr
 
 ####################################################################################    
