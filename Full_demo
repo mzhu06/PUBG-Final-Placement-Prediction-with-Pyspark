@@ -417,6 +417,8 @@ gbr(training_df,validation_df, testing_df )
 #######################################################
 ##########     Randrom Forest of Solo Data  ###########
 from pyspark.ml.regression import RandomForestRegressor
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.evaluation import RegressionEvaluator
 
 
 rf_solo_df = pj_sp_df_solo
@@ -428,7 +430,6 @@ inputcols.remove('winPlacePerc')
 training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
 
 #stages
-from pyspark.ml.feature import VectorAssembler
 va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
 rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
     setFeaturesCol('features')
@@ -464,7 +465,6 @@ inputcols.remove('winPlacePerc')
 training_df, validation_df, testing_df = rf_team_df.randomSplit([0.6, 0.3, 0.1], seed=0)
 
 #stages
-from pyspark.ml.feature import VectorAssembler
 va2 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
 rf2 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
     setFeaturesCol('features')
