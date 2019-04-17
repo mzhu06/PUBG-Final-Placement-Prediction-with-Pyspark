@@ -495,6 +495,44 @@ predictions2.select('prediction', 'winPlacePerc','features').show(5)
 rmse = evaluator.evaluate(predictions2)
 print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
 
+pd.DataFrame(list(zip(inputcols, rf_model2.stages[-1].featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight')
+
+##########     Randrom Forest of solo  Original Data  ###########
+
+rf_solo_df = pj_sp_df_solo
+#rf_team_df.withColumnRenamed('winPlacePerc', 'label')
+inputcols = rf_solo_df.columns
+inputcols.remove('winPlacePerc')
+
+#split data into train, validation and test
+training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
+
+#stages
+from pyspark.ml.feature import VectorAssembler
+va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
+rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
+    setFeaturesCol('features')
+
+# Chain indexer and forest in a Pipeline
+rf_pipeline1 = Pipeline(stages=[va1, rf1])
+
+# Train model.  This also runs the indexer.
+rf_model1 = rf_pipeline1.fit(training_df)
+
+#Test on validation dataset
+predictions1 = rf_model1.transform(validation_df)
+
+#select example rows to display
+predictions1.select('prediction', 'winPlacePerc','features').show(5)
+
+# validation error
+# Select (prediction, true label) and compute test error
+rmse = evaluator.evaluate(predictions2)
+print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+
+pd.DataFrame(list(zip(inputcols, rf_model1.stages[-1].featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight')
 
 ####################################################################################
 training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
