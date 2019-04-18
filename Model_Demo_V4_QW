@@ -433,6 +433,7 @@ pd.DataFrame(list(zip(inputcol, gbr_solo.stages[-1].featureImportances.toArray()
 
 #######################################################
 ##########     Randrom Forest of Solo Data  ###########
+
 from pyspark.ml.regression import RandomForestRegressor
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.evaluation import RegressionEvaluator
@@ -478,18 +479,15 @@ print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model1.featureImportance
 ##########     Randrom Forest of Team  Original Data  ###########
 
 rf_team_df = pj_sp_df_team
-#rf_team_df.withColumnRenamed('winPlacePerc', 'label')
-inputcols = rf_team_df.columns
-inputcols.remove('winPlacePerc')
+rf_team_df = rf_team_df.withColumnRenamed('winPlacePerc', 'label')
+inputcols = rf_solo_df.columns
+inputcols.remove('label')
 
 #split data into train, validation and test
-training_df, validation_df, testing_df = rf_team_df.randomSplit([0.6, 0.3, 0.1], seed=0)
+training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
 
-#stages
 va2 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
-rf2 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
-    setFeaturesCol('features')
-
+rf2 = RandomForestRegressor(seed = 0)#.setLabelCol('winPlacePerc').setFeaturesCol('features')
 # Chain indexer and forest in a Pipeline
 rf_pipeline2 = Pipeline(stages=[va2, rf2])
 
@@ -500,36 +498,34 @@ rf_model2 = rf_pipeline2.fit(training_df)
 predictions2 = rf_model2.transform(validation_df)
 
 #select example rows to display
-predictions2.select('prediction', 'winPlacePerc','features').show(5)
+predictions2.select('prediction','label', 'features').show(5)
 
 # validation error
 # Select (prediction, true label) and compute test error
-rmse = evaluator.evaluate(predictions2)
-print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+evaluator = RegressionEvaluator(labelCol='label', predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(predictions1)
+print("Root Mean Squared Error (RMSE) on validation data of rf2= %g" % rmse)
 
-#feature interpretations
 rf_model2 = rf_model2.stages[-1]
 print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model2.featureImportances.toArray())),
             columns = ['column', 'weight']).sort_values('weight'))
-
            
 
+#################################################################
 ##########     Randrom Forest of solo  Original Data  ###########
-
+# rename predicting column and create cols for pipeline
 rf_solo_df = pj_sp_df_solo
-#rf_team_df.withColumnRenamed('winPlacePerc', 'label')
+rf_solo_df = rf_solo_df.withColumnRenamed('winPlacePerc', 'label')
 inputcols = rf_solo_df.columns
-inputcols.remove('winPlacePerc')
+inputcols.remove('label')
 
 #split data into train, validation and test
 training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
 
-#stages
+#stages and pipeline
 from pyspark.ml.feature import VectorAssembler
 va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
-rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
-    setFeaturesCol('features')
-
+rf1 = RandomForestRegressor(seed = 0)#.setLabelCol('winPlacePerc').setFeaturesCol('features')
 # Chain indexer and forest in a Pipeline
 rf_pipeline1 = Pipeline(stages=[va1, rf1])
 
@@ -540,15 +536,17 @@ rf_model1 = rf_pipeline1.fit(training_df)
 predictions1 = rf_model1.transform(validation_df)
 
 #select example rows to display
-predictions1.select('prediction', 'winPlacePerc','features').show(5)
+predictions1.select('prediction','label', 'features').show(5)
 
 # validation error
 # Select (prediction, true label) and compute test error
+evaluator = RegressionEvaluator(labelCol='label', predictionCol="prediction", metricName="rmse")
 rmse = evaluator.evaluate(predictions1)
-print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+print("Root Mean Squared Error (RMSE) on validation data of rf1= %g" % rmse)
 
-pd.DataFrame(list(zip(inputcols, rf_model1.stages[-1].featureImportances.toArray())),
-            columns = ['column', 'weight']).sort_values('weight')
+rf_model1 = rf_model1.stages[-1]
+print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model1.featureImportances.toArray())),
+            columns = ['column', 'weight']).sort_values('weight'))
 
 ####################################################################################
 training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
