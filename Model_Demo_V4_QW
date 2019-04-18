@@ -386,8 +386,9 @@ inputcol.remove('winPlacePerc')
 
 def gbr(training_df,validation_df, testing_df):
     #gbr = regression.GBTRegressor(seed=0,stepSize=0.03,minInfoGain = 0.5,minInstancesPerNode =10).\
-    #gbr = regression.GBTRegressor(seed=0,stepSize=0.01).\
-    gbr = regression.GBTRegressor(seed=0,stepSize=0.03).\
+    #gbr = regression.GBTRegressor(seed=0,stepSize=0.03).\
+    #gbr = regression.GBTRegressor(seed=0,stepSize=0.03).\
+    gbr = regression.GBTRegressor(seed=0).\
           setMaxIter(100).\
           setLabelCol('winPlacePerc').\
           setFeaturesCol('features')
