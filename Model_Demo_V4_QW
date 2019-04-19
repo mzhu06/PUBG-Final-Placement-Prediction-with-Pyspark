@@ -28,7 +28,9 @@ import pandas as pd
 ##########       Spark creat and transform data             #################
 ##############################################################################
 ## Spark Method ##
+# Full_data = spark.read.csv('test_V2.csv', sep=',', inferSchema=True, header=True)
 Full_data = spark.read.csv('train_V2.csv', sep=',', inferSchema=True, header=True)
+Full_data.printSchema
 # seperate match type
 update_fun = (fn.when(fn.col('matchType').contains('solo'), 'solo').when(fn.col('matchType').contains('duo' or 'crash'), 'duo')
                 .otherwise('squad'))
@@ -36,11 +38,14 @@ Full_data = Full_data.withColumn('matchType', update_fun)
 ##############################################################################
 ###### collect solo match
 New_df_solo = Full_data.filter(Full_data.matchType == 'solo')
-columns = ['Id','groupId','matchId','matchType']
+New_df_solo = New_df_solo.withColumn('totalDistance',fn.col('rideDistance') + fn.col('walkDistance')+ fn.col('swimDistance'))
+New_df_solo = New_df_solo.withColumn('killpercentile',fn.col('killPlace')/fn.col('maxPlace'))
+columns = ['Id','groupId','matchId','matchType','rideDistance','walkDistance','swimDistance','rankPoints','killPoints','winPoints','killPlace','maxPlace']
 New_df_solo = New_df_solo.select([col for col in New_df_solo.columns if col not in columns])
-pj_sp_df_solo = New_df_solo.sample(withReplacement=False, fraction=0.1, seed=3)
+pj_sp_df_solo = New_df_solo.sample(withReplacement=False, fraction=0.01, seed=3)
 ##############################################################################
 ###### collect team match
+New_df_team = Full_data.filter(Full_data.matchType != 'solo')
 New_df_team  = Full_data.select('*').groupby('groupId').agg(fn.sum('damageDealt').alias('total_team_damage'),
                       fn.sum('kills').alias('total_team_kills'),
                       fn.sum('killPoints').alias('team_kill_points'),
@@ -51,15 +56,17 @@ New_df_team  = Full_data.select('*').groupby('groupId').agg(fn.sum('damageDealt'
                       fn.sum('assists').alias('total_assists'),
                       fn.sum('DBNOs').alias('team_DBNOs'),
                       fn.sum(Full_data.rideDistance + Full_data.walkDistance + Full_data.swimDistance).alias('totalDistance'))
+
 New_df_team  = New_df_team.join(Full_data,New_df_team .groupId == Full_data.groupId)
+New_df_team = New_df_team.withColumn('teamkillpercentile',fn.col('team_kill_rank')/fn.col('maxPlace'))
 
 
 ##
-columns = ['Id','groupId','matchId', 'roadKills','numGroups','rideDistance','walkDistance','swimDistance','kills','killPints','killPlace','rankPoints','revives','boosts','assists','DBNOs','damageDealt']
+columns = ['Id','groupId','matchId', 'roadKills','numGroups','rideDistance','walkDistance','swimDistance','team_kill_rank','maxPlace','kills','killPoints','killPlace','rankPoints','revives','boosts','assists','DBNOs','damageDealt','team_normal_rank']
 New_df_team = New_df_team.select([col for col in New_df_team.columns if col not in columns])
 
 ################################################################################
-pj_sp_df_team = New_df_team.sample(withReplacement=False, fraction=0.1, seed=3)
+pj_sp_df_team = New_df_team.sample(withReplacement=False, fraction=0.01, seed=3)
 ##
 #withColumn('solo',(fn.col('matchType') == 'solo').cast('int')).\
 pj_sp_df_team = pj_sp_df_team.\
@@ -171,8 +178,8 @@ def rmseLr(alpha, beta, fit_df, transform_df, test_df,maxiter = 100):
       lr]).fit(fit_df)
 
     coeff = pipe_Lr_og.stages[2].coefficients.toArray()
-    coeffs_df = pd.DataFrame({'Features': inputcol, 'Coeffs': abs(coeff)})
-    coeffs_df.sort_values('Coeffs', ascending=False)
+    coeffs_df = pd.DataFrame({'Features': inputcol, 'Coeffs': coeff})
+    coeffs_df = coeffs_df.sort_values('Coeffs', ascending=False)
     
     ## rmse of validationdata
     print('RMSE of Validation Data Set')
@@ -189,7 +196,8 @@ def rmseLr(alpha, beta, fit_df, transform_df, test_df,maxiter = 100):
     
     print("R Squared (R2) on test data = %g" % lr_evaluator.evaluate(lr_predictions))
     
-    return {'rmse':rmse3_df.show(),'pipe_model':pipe_Lr_og,'Train_su': train_summary,'Test_model':lr_predictions}
+    return {'rmse':rmse3_df.show(),'pipe_model':pipe_Lr_og,'Train_su': train_summary,'Test_model':lr_predictions,'coeff':coeffs_df}
+
 
 ############################################################################3
 def runModel(model,training_df, validation_df, testing_df):
@@ -224,6 +232,8 @@ runModel(rmseLr,training_df, validation_df, testing_df)
 #             +-------------------+
 #             |0.12931329250256463|
 #             +-------------------+
+lr_t = rmseLr(0,0,training_df, validation_df, testing_df)
+lr_t['coeff']
 ################################################################
         
 ##########     Linear Model of solo  Original Data  ############
@@ -243,6 +253,9 @@ runModel(rmseLr,training_df, validation_df, testing_df)
 #           +-------------------+
 #           |0.10608384409927706|
 #           +-------------------+
+
+lr_s = rmseLr(0,0,training_df, validation_df, testing_df)
+lr_s['coeff']
 ################################################################
 #############       PCA Linear Model     ###################
 pc_sp_df_team = spark.createDataFrame(pc_df_team)
@@ -384,12 +397,12 @@ training_df, validation_df, testing_df = pj_sp_df_team.randomSplit([0.6, 0.3, 0.
 inputcol = pj_sp_df_team.columns
 inputcol.remove('winPlacePerc')
 
-def gbr(training_df,validation_df, testing_df):
+def gbr(training_df,validation_df, testing_df,md=3,mi=100):
     #gbr = regression.GBTRegressor(seed=0,stepSize=0.03,minInfoGain = 0.5,minInstancesPerNode =10).\
     #gbr = regression.GBTRegressor(seed=0,stepSize=0.03).\
     #gbr = regression.GBTRegressor(seed=0,stepSize=0.03).\
-    gbr = regression.GBTRegressor(seed=0).\
-          setMaxIter(100).\
+    gbr = regression.GBTRegressor(seed=0,maxDepth=md).\
+          setMaxIter(mi).\
           setLabelCol('winPlacePerc').\
           setFeaturesCol('features')
     
@@ -403,21 +416,27 @@ def gbr(training_df,validation_df, testing_df):
     predictions = pipe_gbr.transform(validation_df)
     R2_gbr = evaluator.evaluate(predictions)
     rmse = evaluator2.evaluate(predictions)
+    print('mi:',mi,'md:',md)
     print("Performance of GBR(validate) R2: ", R2_gbr)
     print("---------------------------------------")
     print("Performance of GBR(validate) RMSE: ", rmse)
     
-    predictions = pipe_gbr.transform(testing_df)
-    R2_gbr = evaluator.evaluate(predictions)
-    rmse = evaluator2.evaluate(predictions)
-    print("---------------------------------------")
-    print("Performance of GBR(testing) R2: ", R2_gbr)
-    print("---------------------------------------")
-    print("Performance of GBR(testing) RMSE: ", rmse)
+    
+#    predictions = pipe_gbr.transform(testing_df)
+#    R2_gbr = evaluator.evaluate(predictions)
+#    rmse = evaluator2.evaluate(predictions)
+#    print("---------------------------------------")
+#    print("Performance of GBR(testing) R2: ", R2_gbr)
+#    print("---------------------------------------")
+#    print("Performance of GBR(testing) RMSE: ", rmse)
     return pipe_gbr
 
-####################################################################################    
-gbr_team = gbr(training_df,validation_df, testing_df )
+####################################################################################   
+for mi in range(30,100,10):
+    for md in range(3,10):
+        gbr(training_df,validation_df, testing_df,md,mi)
+
+gbr_team = gbr(training_df,validation_df, testing_df,6,100 )
 pd.DataFrame(list(zip(inputcol, gbr_team.stages[-1].featureImportances.toArray())),
             columns = ['column', 'weight']).sort_values('weight')
 
@@ -433,10 +452,8 @@ pd.DataFrame(list(zip(inputcol, gbr_solo.stages[-1].featureImportances.toArray()
 
 #######################################################
 ##########     Randrom Forest of Solo Data  ###########
-
 from pyspark.ml.regression import RandomForestRegressor
-from pyspark.ml.feature import VectorAssembler
-from pyspark.ml.evaluation import RegressionEvaluator
+
 
 rf_solo_df = pj_sp_df_solo
 # rf_solo_df.withColumnRenamed('winPlacePerc', 'label')
@@ -447,106 +464,126 @@ inputcols.remove('winPlacePerc')
 training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
 
 #stages
-va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
-rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
-    setFeaturesCol('features')
+def modelRF(training_df,validation_df, testing_df,md=3,mi=100):
+    va = feature.VectorAssembler(inputCols=inputcols, outputCol='features')
+    rf = regression.RandomForestRegressor(seed = 0,maxDepth=md,numTrees=mi).\
+          setLabelCol('winPlacePerc').setFeaturesCol('features')
+    # Chain indexer and forest in a Pipeline
+    rf_pipeline = Pipeline(stages=[va, rf])
+    # Train model.  This also runs the indexer.
+    rf_model = rf_pipeline.fit(training_df)
+    #Test on validation dataset
+    predictions = rf_model.transform(validation_df)
+    #select example rows to display
+    #predictions.select('prediction', 'winPlacePerc','features').show(5)
+    # validation error
+    # Select (prediction, true label) and compute test error
+    evaluator = evaluation.RegressionEvaluator(labelCol='winPlacePerc', predictionCol="prediction", metricName="rmse")
+    rmse = evaluator.evaluate(predictions)
+    print('mi:',mi,'md:',md)
+    print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+    return rf_model
 
-# Chain indexer and forest in a Pipeline
-rf_pipeline1 = Pipeline(stages=[va1, rf1])
+for mi in range(30,100,10):
+    for md in range(3,10):
+        modelRF(training_df,validation_df, testing_df,md,mi)
 
-# Train model.  This also runs the indexer.
-rf_model1 = rf_pipeline1.fit(training_df)
-
-#Test on validation dataset
-predictions1 = rf_model1.transform(validation_df)
-
-#select example rows to display
-predictions1.select('prediction', 'winPlacePerc','features').show(5)
-
-# validation error
-# Select (prediction, true label) and compute test error
-evaluator = RegressionEvaluator(labelCol='winPlacePerc', predictionCol="prediction", metricName="rmse")
-rmse = evaluator.evaluate(predictions1)
-print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
-
-#feature interpretations
-rf_model1 = rf_model1.stages[-1]
-print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model1.featureImportances.toArray())),
-            columns = ['column', 'weight']).sort_values('weight'))
+#va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
+#rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
+#    setFeaturesCol('features')
+#
+## Chain indexer and forest in a Pipeline
+#rf_pipeline1 = Pipeline(stages=[va1, rf1])
+#
+## Train model.  This also runs the indexer.
+#rf_model1 = rf_pipeline1.fit(training_df)
+#
+##Test on validation dataset
+#predictions1 = rf_model1.transform(validation_df)
+#
+##select example rows to display
+#predictions1.select('prediction', 'winPlacePerc','features').show(5)
+#
+## validation error
+## Select (prediction, true label) and compute test error
+#evaluator = RegressionEvaluator(labelCol='winPlacePerc', predictionCol="prediction", metricName="rmse")
+#rmse = evaluator.evaluate(predictions1)
+#print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
 
 
 #################################################################
 ##########     Randrom Forest of Team  Original Data  ###########
 
 rf_team_df = pj_sp_df_team
-rf_team_df = rf_team_df.withColumnRenamed('winPlacePerc', 'label')
-inputcols = rf_solo_df.columns
-inputcols.remove('label')
+#rf_team_df.withColumnRenamed('winPlacePerc', 'label')
+inputcols = rf_team_df.columns
+inputcols.remove('winPlacePerc')
 
 #split data into train, validation and test
-training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
+training_df, validation_df, testing_df = rf_team_df.randomSplit([0.6, 0.3, 0.1], seed=0)
+#from pyspark.ml.feature import VectorAssembler
 
-va2 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
-rf2 = RandomForestRegressor(seed = 0)#.setLabelCol('winPlacePerc').setFeaturesCol('features')
-# Chain indexer and forest in a Pipeline
-rf_pipeline2 = Pipeline(stages=[va2, rf2])
+for mi in range(30,100,10):
+    for md in range(3,10):
+        modelRF(training_df,validation_df, testing_df,md,mi)
 
-# Train model.  This also runs the indexer.
-rf_model2 = rf_pipeline2.fit(training_df)
 
-#Test on validation dataset
-predictions2 = rf_model2.transform(validation_df)
+#def modelRF(training_df,validation_df, testing_df,md=3,mi=100):
+#    va = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
+#    rf = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
+#          setFeaturesCol('features')
+#    # Chain indexer and forest in a Pipeline
+#    rf_pipeline = Pipeline(stages=[va, rf])
+#    # Train model.  This also runs the indexer.
+#    rf_model = rf_pipeline.fit(training_df)
+#    #Test on validation dataset
+#    predictions = rf_model.transform(validation_df)
+#    #select example rows to display
+#    predictions.select('prediction', 'winPlacePerc','features').show(5)
+#    # validation error
+#    # Select (prediction, true label) and compute test error
+#    rmse = evaluator.evaluate(predictions)
+#    print('mi:',mi,'md:',md)
+#    print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
 
-#select example rows to display
-predictions2.select('prediction','label', 'features').show(5)
-
-# validation error
-# Select (prediction, true label) and compute test error
-evaluator = RegressionEvaluator(labelCol='label', predictionCol="prediction", metricName="rmse")
-rmse = evaluator.evaluate(predictions1)
-print("Root Mean Squared Error (RMSE) on validation data of rf2= %g" % rmse)
-
-rf_model2 = rf_model2.stages[-1]
-print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model2.featureImportances.toArray())),
-            columns = ['column', 'weight']).sort_values('weight'))
-           
-
-#################################################################
-##########     Randrom Forest of solo  Original Data  ###########
-# rename predicting column and create cols for pipeline
-rf_solo_df = pj_sp_df_solo
-rf_solo_df = rf_solo_df.withColumnRenamed('winPlacePerc', 'label')
-inputcols = rf_solo_df.columns
-inputcols.remove('label')
-
-#split data into train, validation and test
-training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
-
-#stages and pipeline
-from pyspark.ml.feature import VectorAssembler
-va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
-rf1 = RandomForestRegressor(seed = 0)#.setLabelCol('winPlacePerc').setFeaturesCol('features')
-# Chain indexer and forest in a Pipeline
-rf_pipeline1 = Pipeline(stages=[va1, rf1])
-
-# Train model.  This also runs the indexer.
-rf_model1 = rf_pipeline1.fit(training_df)
-
-#Test on validation dataset
-predictions1 = rf_model1.transform(validation_df)
-
-#select example rows to display
-predictions1.select('prediction','label', 'features').show(5)
-
-# validation error
-# Select (prediction, true label) and compute test error
-evaluator = RegressionEvaluator(labelCol='label', predictionCol="prediction", metricName="rmse")
-rmse = evaluator.evaluate(predictions1)
-print("Root Mean Squared Error (RMSE) on validation data of rf1= %g" % rmse)
-
-rf_model1 = rf_model1.stages[-1]
-print(pd.DataFrame(list(zip(training_df.columns[2:], rf_model1.featureImportances.toArray())),
-            columns = ['column', 'weight']).sort_values('weight'))
+#pd.DataFrame(list(zip(inputcols, rf_model.stages[-1].featureImportances.toArray())),
+#            columns = ['column', 'weight']).sort_values('weight')
+#
+###########     Randrom Forest of solo  Original Data  ###########
+#
+#rf_solo_df = pj_sp_df_solo
+##rf_team_df.withColumnRenamed('winPlacePerc', 'label')
+#inputcols = rf_solo_df.columns
+#inputcols.remove('winPlacePerc')
+#
+##split data into train, validation and test
+#training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
+#
+##stages
+#from pyspark.ml.feature import VectorAssembler
+#va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
+#rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
+#    setFeaturesCol('features')
+#
+## Chain indexer and forest in a Pipeline
+#rf_pipeline1 = Pipeline(stages=[va1, rf1])
+#
+## Train model.  This also runs the indexer.
+#rf_model1 = rf_pipeline1.fit(training_df)
+#
+##Test on validation dataset
+#predictions1 = rf_model1.transform(validation_df)
+#
+##select example rows to display
+#predictions1.select('prediction', 'winPlacePerc','features').show(5)
+#
+## validation error
+## Select (prediction, true label) and compute test error
+#rmse = evaluator.evaluate(predictions1)
+#print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
+#
+#pd.DataFrame(list(zip(inputcols, rf_model1.stages[-1].featureImportances.toArray())),
+#            columns = ['column', 'weight']).sort_values('weight')
 
 ####################################################################################
 training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
@@ -557,7 +594,7 @@ mlp = classification.MultilayerPerceptronClassifier(seed=0).\
     setMaxIter(100).\
     setLabelCol('rank').\
     setFeaturesCol('features').\
-    setLayers([24,10, 10])
+    setLayers([24,30,15, 10])
     
 va =  feature.VectorAssembler(inputCols=inputcols, outputCol='features')   
 
@@ -568,6 +605,7 @@ evaluator = evaluation.MulticlassClassificationEvaluator(labelCol='rank', predic
 
 predictions = pipe_mlp.transform(validation_df)
 accuracy = evaluator.evaluate(predictions)
+print('Accuracy:' ,accuracy)
 
 ####################################################################################
 training_df, validation_df, testing_df = pj_lg_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
@@ -578,7 +616,7 @@ mlp = classification.MultilayerPerceptronClassifier(seed=0).\
     setMaxIter(100).\
     setLabelCol('rank').\
     setFeaturesCol('features').\
-    setLayers([23,10, 10])
+    setLayers([23,20, 10])
     
 va =  feature.VectorAssembler(inputCols=inputcols, outputCol='features')   
 
@@ -589,3 +627,89 @@ evaluator = evaluation.MulticlassClassificationEvaluator(labelCol='rank', predic
 
 predictions = pipe_mlp.transform(validation_df)
 accuracy = evaluator.evaluate(predictions)
+print('Accuracy:' ,accuracy)
+
+#######################################################################################
+#paramGrid = ParamGridBuilder() \
+#    .addGrid(hashingTF.numFeatures, [10, 100, 1000]) \
+#    .addGrid(lr.regParam, [0.1, 0.01]) \
+#    .build()
+#
+#crossval = CrossValidator(estimator=pipeline,
+#                          estimatorParamMaps=paramGrid,
+#                          evaluator=BinaryClassificationEvaluator(),
+#                          numFolds=2)  # use 3+ folds in practice
+
+####################################################################################################################
+ #############################                        Prediction                       ############################# 
+####################################################################################################################
+#############################       Spark creat  Test and transform data             ###############################
+####################################################################################################################
+## Spark Method ##
+# Full_data = spark.read.csv('test_V2.csv', sep=',', inferSchema=True, header=True)
+Full_test_data = spark.read.csv('cip.csv', sep=',', inferSchema=True, header=True)
+# seperate match type
+update_fun = (fn.when(fn.col('matchType').contains('solo'), 'solo').when(fn.col('matchType').contains('duo' or 'crash'), 'duo')
+                .otherwise('squad'))
+Full_test_data = Full_test_data.withColumn('matchType', update_fun)
+##############################################################################
+###### collect solo match
+New_df_solo = Full_test_data.filter(Full_test_data.matchType == 'solo')
+New_df_solo = New_df_solo.withColumn('totalDistance',fn.col('rideDistance') + fn.col('walkDistance')+ fn.col('swimDistance'))
+New_df_solo = New_df_solo.withColumn('killpercentile',fn.col('killPlace')/fn.col('maxPlace'))
+columns = ['Id','groupId','matchId','matchType','rideDistance','walkDistance','swimDistance','rankPoints','killPoints','winPoints','killPlace','maxPlace']
+New_df_solo = New_df_solo.select([col for col in New_df_solo.columns if col not in columns])
+#New_df_solo = New_df_solo.select('*').fn.sum(New_df_solo.rideDistance + New_df_solo.walkDistance + New_df_solo.swimDistance).alias('totalDistance')
+test_sp_df_solo = New_df_solo
+#test_sp_df_solo = New_df_solo.sample(withReplacement=False, fraction=0.1, seed=3)
+##############################################################################
+###### collect team match
+New_df_team = Full_test_data.filter(Full_test_data.matchType != 'solo')
+New_df_team  = New_df_team.select('*').groupby('groupId').agg(fn.sum('damageDealt').alias('total_team_damage'),
+                      fn.sum('kills').alias('total_team_kills'),
+                      fn.sum('killPoints').alias('team_kill_points'),
+                      fn.avg('killPlace').alias('team_kill_rank'),
+                      fn.avg('rankPoints').alias('team_normal_rank'),
+                      fn.sum('revives').alias('team_revives'),
+                      fn.sum('boosts').alias('team_boosts'),
+                      fn.sum('assists').alias('total_assists'),
+                      fn.sum('DBNOs').alias('team_DBNOs'),
+                      fn.sum(Full_test_data.rideDistance + Full_test_data.walkDistance + Full_test_data.swimDistance).alias('totalDistance'))
+New_df_team  = New_df_team.join(Full_test_data,New_df_team .groupId == Full_test_data.groupId)
+New_df_team = New_df_team.withColumn('teamkillpercentile',fn.col('team_kill_rank')/fn.col('maxPlace'))
+
+##
+columns = ['Id','groupId','matchId', 'roadKills','numGroups','rideDistance','walkDistance','swimDistance','team_kill_rank','maxPlace','kills','killPoints','killPlace','rankPoints','revives','boosts','assists','DBNOs','damageDealt','team_normal_rank']
+New_df_team = New_df_team.select([col for col in New_df_team.columns if col not in columns])
+
+
+################################################################################
+test_sp_df_team = New_df_team
+#test_sp_df_team = New_df_team.sample(withReplacement=False, fraction=0.1, seed=3)
+##
+#withColumn('solo',(fn.col('matchType') == 'solo').cast('int')).\
+test_sp_df_team = test_sp_df_team.\
+                    withColumn('duo',(fn.col('matchType') == 'duo').cast('int')).\
+                    withColumn('squad',(fn.col('matchType') == 'squad').cast('int'))
+test_sp_df_team = test_sp_df_team.drop('matchType')
+test_sp_df_team.show(5)
+####################################################################################
+id_team = test_sp_df_team.select('Id').toPandas()
+#inputcol.remove('winPlacePerc')
+test_sp_df_team=test_sp_df_team.drop('Id')
+predict_team = gbr_team.transform(test_sp_df_team)
+result_pre = predict_team.select('prediction').toPandas()
+result_team = pd.concat([id_team, result_pre], axis=1)
+####################################################################################
+id_solo= test_sp_df_solo.select('Id').toPandas()
+#inputcol.remove('winPlacePerc')
+test_sp_df_solo=test_sp_df_solo.drop('Id')
+predict_solo = gbr_solo.transform(test_sp_df_solo)
+result_pre = predict_solo.select('prediction').toPandas()
+result_solo = pd.concat([id_solo, result_pre], axis=1)
+##################################################################################
+result = pd.concat([result_solo, result_team])
+id_test = Full_test_data.select('Id').toPandas()
+result=result.set_index('Id').reindex(id_test.set_index('Id').index).reset_index()
+result = result.rename(columns = {'prediction' :'winPlacePerc'})
+result.to_csv('submission.csv', index=False)
