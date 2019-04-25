@@ -32,11 +32,18 @@ import pandas as pd
 Full_data = spark.read.csv('train_V2.csv', sep=',', inferSchema=True, header=True)
 Full_data.printSchema
 # seperate match type
+##############################################################################
+#  combine the original matchtype to only three types : solo, duo squad
+##############################################################################
 update_fun = (fn.when(fn.col('matchType').contains('solo'), 'solo').when(fn.col('matchType').contains('duo' or 'crash'), 'duo')
                 .otherwise('squad'))
 Full_data = Full_data.withColumn('matchType', update_fun)
 ##############################################################################
 ###### collect solo match
+##############################################################################
+###    Feature engineering
+#  combined rideDistance, walkDistance, swimdistance as total Distance
+#  create killpercentile feature = killplace/maxplace
 New_df_solo = Full_data.filter(Full_data.matchType == 'solo')
 New_df_solo = New_df_solo.withColumn('totalDistance',fn.col('rideDistance') + fn.col('walkDistance')+ fn.col('swimDistance'))
 New_df_solo = New_df_solo.withColumn('killpercentile',fn.col('killPlace')/fn.col('maxPlace'))
@@ -45,6 +52,8 @@ New_df_solo = New_df_solo.select([col for col in New_df_solo.columns if col not 
 pj_sp_df_solo = New_df_solo.sample(withReplacement=False, fraction=0.01, seed=3)
 ##############################################################################
 ###### collect team match
+# combined all the personal features into teamfeatures
+########
 New_df_team = Full_data.filter(Full_data.matchType != 'solo')
 New_df_team  = Full_data.select('*').groupby('groupId').agg(fn.sum('damageDealt').alias('total_team_damage'),
                       fn.sum('kills').alias('total_team_kills'),
@@ -137,27 +146,27 @@ class PCA:
 ##########################################################      
 ##########    PCA  (solo)      #################### 
 solo_model = PCA(pj_sp_df_solo)
-solo_model.Pipe_line(20)
+solo_model.Pipe_line(18)
 solo_model.PC()
 solo_model.choose()
 ##########         PC Results first two dimension
 pc1_pd = solo_model.Print_first2()['pc1']
 pc2_pd = solo_model.Print_first2()['pc2']
 ##############      Reduced Dimension      #############################
-pc_df_solo = solo_model.reduced_dm(16)
+pc_df_solo = solo_model.reduced_dm(13)
 pc_df_solo.describe()
 ##########################################################  
 
 ##########    PCA  (team)      #################### 
 team_model = PCA(pj_sp_df_team)
-team_model.Pipe_line(20)
+team_model.Pipe_line(18)
 team_model.PC()
 team_model.choose()
 ##########         PC Results first two dimension
 pc1_pd = team_model.Print_first2()['pc1']
 pc2_pd = team_model.Print_first2()['pc2']
 ##############      Reduced Dimension      #############################
-pc_df_team = team_model.reduced_dm(16)
+pc_df_team = team_model.reduced_dm(15)
 pc_df_team.describe()
 ########################################################## 
 ########################################################## 
@@ -292,10 +301,10 @@ runModel(rmseLr,training_df, validation_df, testing_df)
 
 
 ##############################################################
-#Logit
+#      Logit     model
 ##############################################################
-#split the data set into five categories in 
-
+#split the data set into ten categories in 
+# bucket
 splits = [ float("-inf"), 0.1, 0.2, 0.3,0.4,0.5,0.6,0.7,0.8,0.9, float('Inf') ]
 from pyspark.ml.feature import Bucketizer
 bucketizer = Bucketizer(splits=splits ,inputCol='winPlacePerc', outputCol='rank')
@@ -337,20 +346,7 @@ def logitReg(reg,elastic,training,validate,test):
     accuracy = evaluator.evaluate(predictions)
     print("Test Error = %g" % (1.0 - accuracy),"Accuracy = %g" % (accuracy))
 ##################################################
-###################    
-#def runLgModel():
-#    n = 0
-#    for i in np.arange(0,1.1,0.1):
-#       if i == 0 or i == 1:
-#          for j in np.arange(0,0.2,0.1):
-#            n+=1
-#            print('Model:',n,'Alpha:',i,"Lambda: ",j)
-#            logitReg(i,j,training_df, validation_df)
-#       else:
-#           j = 0.1
-#           n+=1
-#           print('Model:',n,'Alpha:',i,"Lambda: ",j)
-#           logitReg(i,j,training_df, validation_df)
+
 ###################  
 runModel(logitReg,training_df, validation_df, testing_df)
 #####################################################################
@@ -358,49 +354,12 @@ training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.
 ###################  
 runModel(logitReg,training_df, validation_df, testing_df)
 
-#################           customer input dat              #########################
-#columns = pj_sp_df_team.columns
-#pj_sp_df_team.printSchema()
-##root
-## |-- total_team_damage: double (nullable = true)
-## |-- total_team_kills: long (nullable = true)
-## |-- team_kill_points: long (nullable = true)
-## |-- team_kill_rank: double (nullable = true)
-## |-- team_normal_rank: double (nullable = true)
-## |-- team_revives: long (nullable = true)
-## |-- team_boosts: long (nullable = true)
-## |-- total_assists: long (nullable = true)
-## |-- team_DBNOs: long (nullable = true)
-## |-- totalDistance: double (nullable = true)
-## |-- damageDealt: double (nullable = true)
-## |-- headshotKills: integer (nullable = true)
-## |-- heals: integer (nullable = true)
-## |-- killPoints: integer (nullable = true)
-## |-- killStreaks: integer (nullable = true)
-## |-- longestKill: double (nullable = true)
-## |-- matchDuration: integer (nullable = true)
-## |-- maxPlace: integer (nullable = true)
-## |-- teamKills: integer (nullable = true)
-## |-- vehicleDestroys: integer (nullable = true)
-## |-- weaponsAcquired: integer (nullable = true)
-## |-- winPoints: integer (nullable = true)
-## |-- winPlacePerc: double (nullable = true)
-## |-- duo: integer (nullable = false)
-## |-- squad: integer (nullable = false)
-#newRow = newRow = spark.createDataFrame([], columns)
-#appended = pj_sp_df_team.union(newRow)
-#appended.show()
-
-
 ####################################################################################
 training_df, validation_df, testing_df = pj_sp_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
 inputcol = pj_sp_df_team.columns
 inputcol.remove('winPlacePerc')
 
 def gbr(training_df,validation_df, testing_df,md=3,mi=100):
-    #gbr = regression.GBTRegressor(seed=0,stepSize=0.03,minInfoGain = 0.5,minInstancesPerNode =10).\
-    #gbr = regression.GBTRegressor(seed=0,stepSize=0.03).\
-    #gbr = regression.GBTRegressor(seed=0,stepSize=0.03).\
     gbr = regression.GBTRegressor(seed=0,maxDepth=md).\
           setMaxIter(mi).\
           setLabelCol('winPlacePerc').\
@@ -421,14 +380,6 @@ def gbr(training_df,validation_df, testing_df,md=3,mi=100):
     print("---------------------------------------")
     print("Performance of GBR(validate) RMSE: ", rmse)
     
-    
-#    predictions = pipe_gbr.transform(testing_df)
-#    R2_gbr = evaluator.evaluate(predictions)
-#    rmse = evaluator2.evaluate(predictions)
-#    print("---------------------------------------")
-#    print("Performance of GBR(testing) R2: ", R2_gbr)
-#    print("---------------------------------------")
-#    print("Performance of GBR(testing) RMSE: ", rmse)
     return pipe_gbr
 
 ####################################################################################   
@@ -436,25 +387,29 @@ for mi in range(30,100,10):
     for md in range(3,10):
         gbr(training_df,validation_df, testing_df,md,mi)
 
+#### Best Model for team data
+### maxdepth = 6 ,ax iteration = 100
 gbr_team = gbr(training_df,validation_df, testing_df,6,100 )
 pd.DataFrame(list(zip(inputcol, gbr_team.stages[-1].featureImportances.toArray())),
             columns = ['column', 'weight']).sort_values('weight')
 
-####################################################################################
+####################     solo model   ############################################
 training_df, validation_df, testing_df = pj_sp_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
 inputcol = pj_sp_df_solo.columns
 inputcol.remove('winPlacePerc')
 
+####################################################################################
+for mi in range(30,100,10):
+    for md in range(3,10):
+        gbr(training_df,validation_df, testing_df,md,mi)
+
 ####################################################################################    
-gbr_solo = gbr(training_df,validation_df, testing_df )
+gbr_solo = gbr(training_df,validation_df, testing_df,8,100)
 pd.DataFrame(list(zip(inputcol, gbr_solo.stages[-1].featureImportances.toArray())),
             columns = ['column', 'weight']).sort_values('weight')
 
 #######################################################
 ##########     Randrom Forest of Solo Data  ###########
-from pyspark.ml.regression import RandomForestRegressor
-
-
 rf_solo_df = pj_sp_df_solo
 # rf_solo_df.withColumnRenamed('winPlacePerc', 'label')
 inputcols = rf_solo_df.columns
@@ -484,33 +439,12 @@ def modelRF(training_df,validation_df, testing_df,md=3,mi=100):
     print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
     return rf_model
 
+#################################################################
 for mi in range(30,100,10):
     for md in range(3,10):
         modelRF(training_df,validation_df, testing_df,md,mi)
 
-#va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
-#rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
-#    setFeaturesCol('features')
-#
-## Chain indexer and forest in a Pipeline
-#rf_pipeline1 = Pipeline(stages=[va1, rf1])
-#
-## Train model.  This also runs the indexer.
-#rf_model1 = rf_pipeline1.fit(training_df)
-#
-##Test on validation dataset
-#predictions1 = rf_model1.transform(validation_df)
-#
-##select example rows to display
-#predictions1.select('prediction', 'winPlacePerc','features').show(5)
-#
-## validation error
-## Select (prediction, true label) and compute test error
-#evaluator = RegressionEvaluator(labelCol='winPlacePerc', predictionCol="prediction", metricName="rmse")
-#rmse = evaluator.evaluate(predictions1)
-#print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
-
-
+modelRF(training_df,validation_df, testing_df)
 #################################################################
 ##########     Randrom Forest of Team  Original Data  ###########
 
@@ -527,65 +461,9 @@ for mi in range(30,100,10):
     for md in range(3,10):
         modelRF(training_df,validation_df, testing_df,md,mi)
 
-
-#def modelRF(training_df,validation_df, testing_df,md=3,mi=100):
-#    va = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
-#    rf = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
-#          setFeaturesCol('features')
-#    # Chain indexer and forest in a Pipeline
-#    rf_pipeline = Pipeline(stages=[va, rf])
-#    # Train model.  This also runs the indexer.
-#    rf_model = rf_pipeline.fit(training_df)
-#    #Test on validation dataset
-#    predictions = rf_model.transform(validation_df)
-#    #select example rows to display
-#    predictions.select('prediction', 'winPlacePerc','features').show(5)
-#    # validation error
-#    # Select (prediction, true label) and compute test error
-#    rmse = evaluator.evaluate(predictions)
-#    print('mi:',mi,'md:',md)
-#    print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
-
-#pd.DataFrame(list(zip(inputcols, rf_model.stages[-1].featureImportances.toArray())),
-#            columns = ['column', 'weight']).sort_values('weight')
-#
-###########     Randrom Forest of solo  Original Data  ###########
-#
-#rf_solo_df = pj_sp_df_solo
-##rf_team_df.withColumnRenamed('winPlacePerc', 'label')
-#inputcols = rf_solo_df.columns
-#inputcols.remove('winPlacePerc')
-#
-##split data into train, validation and test
-#training_df, validation_df, testing_df = rf_solo_df.randomSplit([0.6, 0.3, 0.1], seed=0)
-#
-##stages
-#from pyspark.ml.feature import VectorAssembler
-#va1 = VectorAssembler().setInputCols(inputcols).setOutputCol('features')
-#rf1 = RandomForestRegressor(seed = 0).setLabelCol('winPlacePerc').\
-#    setFeaturesCol('features')
-#
-## Chain indexer and forest in a Pipeline
-#rf_pipeline1 = Pipeline(stages=[va1, rf1])
-#
-## Train model.  This also runs the indexer.
-#rf_model1 = rf_pipeline1.fit(training_df)
-#
-##Test on validation dataset
-#predictions1 = rf_model1.transform(validation_df)
-#
-##select example rows to display
-#predictions1.select('prediction', 'winPlacePerc','features').show(5)
-#
-## validation error
-## Select (prediction, true label) and compute test error
-#rmse = evaluator.evaluate(predictions1)
-#print("Root Mean Squared Error (RMSE) on validation data = %g" % rmse)
-#
-#pd.DataFrame(list(zip(inputcols, rf_model1.stages[-1].featureImportances.toArray())),
-#            columns = ['column', 'weight']).sort_values('weight')
-
+modelRF(training_df,validation_df, testing_df)
 ####################################################################################
+########   MLP Model for solo data
 training_df, validation_df, testing_df = pj_lg_df_solo.randomSplit([0.6, 0.3, 0.1], seed=0)
 inputcols =  pj_lg_df_solo.columns
 inputcols.remove('rank')
@@ -594,7 +472,7 @@ mlp = classification.MultilayerPerceptronClassifier(seed=0).\
     setMaxIter(100).\
     setLabelCol('rank').\
     setFeaturesCol('features').\
-    setLayers([24,30,15, 10])
+    setLayers([18,30,15, 10])
     
 va =  feature.VectorAssembler(inputCols=inputcols, outputCol='features')   
 
@@ -608,6 +486,7 @@ accuracy = evaluator.evaluate(predictions)
 print('Accuracy:' ,accuracy)
 
 ####################################################################################
+########   MLP Model for team  data
 training_df, validation_df, testing_df = pj_lg_df_team.randomSplit([0.6, 0.3, 0.1], seed=0)
 inputcols =  pj_lg_df_team.columns
 inputcols.remove('rank')
@@ -616,7 +495,7 @@ mlp = classification.MultilayerPerceptronClassifier(seed=0).\
     setMaxIter(100).\
     setLabelCol('rank').\
     setFeaturesCol('features').\
-    setLayers([23,20, 10])
+    setLayers([20,20, 10])
     
 va =  feature.VectorAssembler(inputCols=inputcols, outputCol='features')   
 
@@ -647,22 +526,22 @@ print('Accuracy:' ,accuracy)
 ####################################################################################################################
 ## Spark Method ##
 # Full_data = spark.read.csv('test_V2.csv', sep=',', inferSchema=True, header=True)
-Full_test_data = spark.read.csv('cip.csv', sep=',', inferSchema=True, header=True)
+Full_test_data = spark.read.csv('test_V2.csv', sep=',', inferSchema=True, header=True)
 # seperate match type
 update_fun = (fn.when(fn.col('matchType').contains('solo'), 'solo').when(fn.col('matchType').contains('duo' or 'crash'), 'duo')
                 .otherwise('squad'))
 Full_test_data = Full_test_data.withColumn('matchType', update_fun)
-##############################################################################
+################        Creat solo input Datafram      ###############################
 ###### collect solo match
 New_df_solo = Full_test_data.filter(Full_test_data.matchType == 'solo')
 New_df_solo = New_df_solo.withColumn('totalDistance',fn.col('rideDistance') + fn.col('walkDistance')+ fn.col('swimDistance'))
 New_df_solo = New_df_solo.withColumn('killpercentile',fn.col('killPlace')/fn.col('maxPlace'))
-columns = ['Id','groupId','matchId','matchType','rideDistance','walkDistance','swimDistance','rankPoints','killPoints','winPoints','killPlace','maxPlace']
+columns = ['groupId','matchId','matchType','rideDistance','walkDistance','swimDistance','rankPoints','killPoints','winPoints','killPlace','maxPlace']
 New_df_solo = New_df_solo.select([col for col in New_df_solo.columns if col not in columns])
 #New_df_solo = New_df_solo.select('*').fn.sum(New_df_solo.rideDistance + New_df_solo.walkDistance + New_df_solo.swimDistance).alias('totalDistance')
 test_sp_df_solo = New_df_solo
 #test_sp_df_solo = New_df_solo.sample(withReplacement=False, fraction=0.1, seed=3)
-##############################################################################
+################        Creat team input Datafram       ##############################
 ###### collect team match
 New_df_team = Full_test_data.filter(Full_test_data.matchType != 'solo')
 New_df_team  = New_df_team.select('*').groupby('groupId').agg(fn.sum('damageDealt').alias('total_team_damage'),
@@ -679,15 +558,12 @@ New_df_team  = New_df_team.join(Full_test_data,New_df_team .groupId == Full_test
 New_df_team = New_df_team.withColumn('teamkillpercentile',fn.col('team_kill_rank')/fn.col('maxPlace'))
 
 ##
-columns = ['Id','groupId','matchId', 'roadKills','numGroups','rideDistance','walkDistance','swimDistance','team_kill_rank','maxPlace','kills','killPoints','killPlace','rankPoints','revives','boosts','assists','DBNOs','damageDealt','team_normal_rank']
+columns = ['groupId','matchId', 'roadKills','numGroups','rideDistance','walkDistance','swimDistance','team_kill_rank','maxPlace','kills','killPoints','killPlace','rankPoints','revives','boosts','assists','DBNOs','damageDealt','team_normal_rank']
 New_df_team = New_df_team.select([col for col in New_df_team.columns if col not in columns])
 
 
-################################################################################
+################        Creat team Result Datafram       ##################################
 test_sp_df_team = New_df_team
-#test_sp_df_team = New_df_team.sample(withReplacement=False, fraction=0.1, seed=3)
-##
-#withColumn('solo',(fn.col('matchType') == 'solo').cast('int')).\
 test_sp_df_team = test_sp_df_team.\
                     withColumn('duo',(fn.col('matchType') == 'duo').cast('int')).\
                     withColumn('squad',(fn.col('matchType') == 'squad').cast('int'))
@@ -700,7 +576,7 @@ test_sp_df_team=test_sp_df_team.drop('Id')
 predict_team = gbr_team.transform(test_sp_df_team)
 result_pre = predict_team.select('prediction').toPandas()
 result_team = pd.concat([id_team, result_pre], axis=1)
-####################################################################################
+###############       Creat solo Result Datafram       ####################################
 id_solo= test_sp_df_solo.select('Id').toPandas()
 #inputcol.remove('winPlacePerc')
 test_sp_df_solo=test_sp_df_solo.drop('Id')
@@ -712,4 +588,4 @@ result = pd.concat([result_solo, result_team])
 id_test = Full_test_data.select('Id').toPandas()
 result=result.set_index('Id').reindex(id_test.set_index('Id').index).reset_index()
 result = result.rename(columns = {'prediction' :'winPlacePerc'})
-result.to_csv('submission.csv', index=False)
+result.to_csv('submission2.csv', index=False)
