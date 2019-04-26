@@ -2,7 +2,8 @@
 """
 Created on Sun Mar 24 14:43:57 2019
 
-@author: Qi Wang, Mingyuan Zhu
+@author: Qi Wang, Mingyuan Zhu, Shanshan Ma
+
 """
 
 from pyspark.sql import SparkSession
